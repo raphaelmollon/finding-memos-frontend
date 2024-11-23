@@ -420,7 +420,9 @@ export default {
     async fetchCategories() {
       this.loadingCategories = true;
       try {
-        const response = await fetch('http://127.0.0.1:5000/categories');
+        const response = await fetch('http://127.0.0.1:5000/categories', {
+          credentials: 'include'  // include session cookie
+        });
         if (!response.ok) {
           throw new Error('Failed to fetch categories. Status code: '+response.status);
         }
@@ -439,7 +441,9 @@ export default {
     async fetchTypes() {
       this.loadingTypes = true;
       try {
-        const response = await fetch('http://127.0.0.1:5000/types');
+        const response = await fetch('http://127.0.0.1:5000/types', {
+          credentials: 'include'  // include session cookie
+        });
         if (!response.ok) {
           throw new Error('Failed to fetch types. Status code: ' + response.status);
         }
@@ -458,7 +462,9 @@ export default {
     async fetchMemos() {
       this.loadingMemos = true;
       try {
-        const response = await fetch('http://127.0.0.1:5000/memos');
+        const response = await fetch('http://127.0.0.1:5000/memos', {
+          credentials: 'include'  // include session cookie
+        });
         if (!response.ok) {
           throw new Error('Failed to fetch memos. Status code: '+response.status);
         }
@@ -518,7 +524,8 @@ export default {
         const response = await fetch('http://127.0.0.1:5000/memos', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(this.newMemo)
+          body: JSON.stringify(this.newMemo),
+          credentials: 'include'  // include session cookie
         });
         if (!response.ok) {
           const errorData = await response.json();
@@ -534,7 +541,8 @@ export default {
         const response = await fetch(`http://127.0.0.1:5000/memos/${this.currentMemoId}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(this.newMemo)
+          body: JSON.stringify(this.newMemo),
+          credentials: 'include'  // include session cookie
         });
 
         if (!response.ok) {
@@ -615,7 +623,8 @@ export default {
       this.deleteDialog = false;
       try {
         const response = await fetch(`http://127.0.0.1:5000/memos/${id}`, {
-          method: 'DELETE'
+          method: 'DELETE',
+          credentials: 'include'  // include session cookie
         });
         // Display a success message
         this.snackbarMessage = 'Memo deleted successfully !';

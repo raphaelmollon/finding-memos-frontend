@@ -144,7 +144,9 @@ export default {
   methods: {
     async fetchCategories() {
       try {
-        const response = await fetch('http://127.0.0.1:5000/categories');
+        const response = await fetch('http://127.0.0.1:5000/categories', {
+          credentials: 'include'  // include session cookie
+        });
         if (!response.ok) {
           throw new Error('Failed to retrieve categories.');
         }
@@ -156,7 +158,9 @@ export default {
     },
     async fetchTypes() {
       try {
-        const response = await fetch('http://127.0.0.1:5000/types');
+        const response = await fetch('http://127.0.0.1:5000/types', {
+          credentials: 'include'  // include session cookie
+        });
         if (!response.ok) {
           throw new Error('Failed to retrieve types.');
         }
@@ -210,6 +214,7 @@ export default {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(this.editedProp),
+          credentials: 'include'  // include session cookie
         });
 
         if (!response.ok) {
@@ -230,6 +235,7 @@ export default {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(this.editedProp),
+          credentials: 'include'  // include session cookie
         });
 
         if (!response.ok) {
