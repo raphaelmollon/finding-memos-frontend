@@ -6,11 +6,15 @@ const store = createStore({
         snackbar: false,
         snackbarMessage: '',
         snackbarType: 'success', // 'success', 'error', etc.
+        serverURL: process.env.VUE_APP_API_URL,
+        environment: process.env.VUE_APP_ENV,
     },
     getters: {
         isAuthenticated: state => !!state.user,
         isSuperuser: state => state.user?.is_superuser,
         getUser: state => state.user,
+        getServerURL: state => state.serverURL,
+        isDevelopment: (state) => state.environment === 'development',
     },
     mutations: {
         setUser(state, user) {
@@ -37,9 +41,9 @@ const store = createStore({
         clearUser({ commit }) {
             commit('clearUser');
         },
-        async validateSession({ commit }) {
+        async validateSession({ commit, getters }) {
             try {
-                const response = await fetch('http://127.0.0.1:5000/session-check', {
+                const response = await fetch(getters.getServerURL + '/auth/session-check', {
                     method: 'GET',
                     credentials: 'include', // Include cookies for session validation
                 });

@@ -122,6 +122,8 @@
 </template>
 
 <script>
+import { mapGetters } from 'vuex';
+
 export default {
   data() {
     return {
@@ -141,10 +143,13 @@ export default {
       snackbarType: '',
     };
   },
+  computed: {
+    ...mapGetters(['getServerURL'])
+  },
   methods: {
     async fetchCategories() {
       try {
-        const response = await fetch('http://127.0.0.1:5000/categories', {
+        const response = await fetch(this.getServerURL+'/categories', {
           credentials: 'include'  // include session cookie
         });
         if (!response.ok) {
@@ -158,7 +163,7 @@ export default {
     },
     async fetchTypes() {
       try {
-        const response = await fetch('http://127.0.0.1:5000/types', {
+        const response = await fetch(this.getServerURL+'/types', {
           credentials: 'include'  // include session cookie
         });
         if (!response.ok) {
@@ -210,7 +215,7 @@ export default {
     async saveCategory() {
       try {
         let response;
-        response = await fetch(`http://127.0.0.1:5000/categories/${this.editedProp.id}`, {
+        response = await fetch(this.getServerURL+`/categories/${this.editedProp.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(this.editedProp),
@@ -231,7 +236,7 @@ export default {
     async saveType() {
       try {
         let response;
-        response = await fetch(`http://127.0.0.1:5000/types/${this.editedProp.id}`, {
+        response = await fetch(this.getServerURL+`/types/${this.editedProp.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(this.editedProp),

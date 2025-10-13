@@ -344,6 +344,7 @@ import { Editor, EditorContent } from '@tiptap/vue-3'
 import Placeholder from '@tiptap/extension-placeholder'
 import StarterKit from '@tiptap/starter-kit'
 import Underline from '@tiptap/extension-underline'
+import { mapGetters } from 'vuex';
 
 function stripHtml(html) {
   const tempDiv = document.createElement('div');
@@ -390,9 +391,13 @@ export default {
     };
   },
   computed: {
+    ...mapGetters(['getServerURL']),
     filteredMemos() {
       let filtered = this.memos.filter(memo => {
-        const matchesSearch = memo.name.toLowerCase().includes(this.searchTerm.toLowerCase());
+        let search = "";
+        if (this.searchTerm !== null)
+          search = this.searchTerm.toLowerCase();
+        const matchesSearch = memo.name.toLowerCase().includes(search);
 
         const matchesCategory = this.selectedCategories.length === 0 ||
           this.selectedCategories.includes(memo.category_id);
@@ -420,7 +425,7 @@ export default {
     async fetchCategories() {
       this.loadingCategories = true;
       try {
-        const response = await fetch('http://127.0.0.1:5000/categories', {
+        const response = await fetch(this.getServerURL+'/categories', {
           credentials: 'include'  // include session cookie
         });
         if (!response.ok) {
@@ -441,7 +446,7 @@ export default {
     async fetchTypes() {
       this.loadingTypes = true;
       try {
-        const response = await fetch('http://127.0.0.1:5000/types', {
+        const response = await fetch(this.getServerURL+'/types', {
           credentials: 'include'  // include session cookie
         });
         if (!response.ok) {
@@ -462,7 +467,7 @@ export default {
     async fetchMemos() {
       this.loadingMemos = true;
       try {
-        const response = await fetch('http://127.0.0.1:5000/memos', {
+        const response = await fetch(this.getServerURL+'/memos', {
           credentials: 'include'  // include session cookie
         });
         if (!response.ok) {
@@ -521,7 +526,7 @@ export default {
 
     async addMemo() {
       try {
-        const response = await fetch('http://127.0.0.1:5000/memos', {
+        const response = await fetch(this.getServerURL+'/memos', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(this.newMemo),
@@ -538,7 +543,7 @@ export default {
     },
     async updateMemo() {
       try {
-        const response = await fetch(`http://127.0.0.1:5000/memos/${this.currentMemoId}`, {
+        const response = await fetch(this.getServerURL+`/memos/${this.currentMemoId}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(this.newMemo),
@@ -622,7 +627,7 @@ export default {
       let id = this.currentMemoId;
       this.deleteDialog = false;
       try {
-        const response = await fetch(`http://127.0.0.1:5000/memos/${id}`, {
+        const response = await fetch(this.getServerURL+`/memos/${id}`, {
           method: 'DELETE',
           credentials: 'include'  // include session cookie
         });

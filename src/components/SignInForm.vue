@@ -44,7 +44,7 @@
 </template>
 
 <script>
-import { mapActions } from 'vuex';
+import { mapActions, mapGetters } from 'vuex';
 export default {
   data() {
     return {
@@ -53,11 +53,14 @@ export default {
       showPassword: false,
     };
   },
+  computed: {
+    ...mapGetters(['getServerURL'])
+  },
   methods: {
     ...mapActions(['setUser', 'triggerSnackbar']), 
     async signIn() {
       try {
-        const response = await fetch('http://127.0.0.1:5000/sign-in', {
+        const response = await fetch(this.getServerURL+'/auth/sign-in', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email: this.email, password: this.password }),
