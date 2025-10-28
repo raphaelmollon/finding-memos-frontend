@@ -17,15 +17,15 @@
       {{ snackbarMessage }}
     </v-snackbar>
 
-    <v-row>
+    <v-row justify="center">
       <v-col cols="6">
         <v-card
-          prepend-avatar="https://cdn-icons-png.flaticon.com/512/3940/3940417.png"
+          :prepend-avatar="getUserAvatarUrl(user.avatar)"
           class="mx-auto"
           title="My information"
           subtitle="At least what I can see...">
           <template v-slot:append>
-            <v-icon color="warning" icon="mdi-pencil" @click="openEditDialog(user)"></v-icon>
+            <v-icon color="warning" icon="mdi-pencil" @click="openEditDialog"></v-icon>
           </template>
           <v-card-text class="mx-auto">
             Email: {{ user.email }} <br/>
@@ -36,36 +36,23 @@
       </v-col>
     </v-row>
 
-    <!-- Edit Dialog -->
-    <v-dialog v-model="dialog" max-width="500px">
-      <v-card>
-        <v-card-title>
-          <span class="headline">Edit {{ editedProp.email }}</span>
-        </v-card-title>
-        <v-card-text>
-          <v-form ref="form" @submit.prevent="saveProp">
-            <v-text-field
-              v-model="editedProp.email"
-              label="Email"
-              :rules="[v => !!v || 'Valid email is required']"
-              required
-            ></v-text-field>
-          </v-form>
-        </v-card-text>
-        <v-card-actions>
-          <v-spacer></v-spacer>
-          <v-btn color="red darken-1" text @click="closeDialog">Cancel</v-btn>
-          <v-btn color="green darken-1" text @click="saveProp">Save</v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
+    <!-- Edit Profile Dialog -->
+    <edit-profile-dialog
+      ref="editDialog"
+      :user="user"
+      @profile-updated="onProfileUpdated"
+    ></edit-profile-dialog>
   </v-container>
 </template>
 
 <script>
 import { mapGetters } from 'vuex';
+import EditProfileDialog from './EditProfileDialog.vue';
 
 export default {
+  components: {
+    EditProfileDialog
+  },
   data() {
     return {
       snackbar: false,
@@ -80,6 +67,10 @@ export default {
     ...mapGetters(['getServerURL'])
   },
   methods: {
+    getUserAvatarUrl(filename) {
+      // console.log(`${this.getServerURL}/static/avatars/${filename || '0.png'}`)
+      return `${this.getServerURL}/static/avatars/${filename || '0.png'}`
+    },
     async fetchProfile() {
       try {
         const response = await fetch(this.getServerURL + '/users/me', {
@@ -89,16 +80,17 @@ export default {
           throw new Error('Failed to retrieve user information.');
         }
         const data = await response.json();
-        console.log(data);
+        // console.log(data);
         this.user = data.user;
       } catch (error) {
         console.error('Error while retrieving user information:', error);
       }
     },
-    openEditDialog(item) {
-      console.log("OK!");
-      this.editedProp = { ...item };
-      this.dialog = true;
+    openEditDialog() {
+      this.$refs.editDialog.openDialog()
+    },
+    onProfileUpdated() {
+      this.fetchProfile() // Refresh user data
     },
     closeDialog() {
       this.dialog = false;

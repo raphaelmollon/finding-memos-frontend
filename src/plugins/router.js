@@ -10,6 +10,8 @@ import NotFound from '@/components/NotFound.vue';
 import AdminPage from '@/components/AdminPage.vue';
 import ProfilePage from '@/components/ProfilePage.vue';
 import ConnectionManager from '@/components/ConnectionManager.vue';
+import ValidateEmail from '@/components/ValidateEmail.vue';
+import ResetPassword from '@/components/ResetPassword.vue';
 
 const routes = [
     { path: '/', name: 'Home', component: MemoManager, meta: { requiresAuth: true } },
@@ -20,6 +22,8 @@ const routes = [
     { path: '/administration', name: 'AdminPage', component: AdminPage, meta: { requiresAuth: true, requiresSuperuser: true } },
     { path: '/profile', name: 'ProfilePage', component: ProfilePage, meta: { requiresAuth: true } },
     { path: '/forbidden', name: 'Forbidden', component: Forbidden },
+    { path: '/validate-email', name: 'ValidateEmail', component: ValidateEmail },
+    { path: '/reset-password', name: 'ResetPassword', component: ResetPassword },
     { path: '/:pathMatch(.*)*', name: 'NotFound', component: NotFound },
 ];
 

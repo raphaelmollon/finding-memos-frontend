@@ -64,6 +64,50 @@ const store = createStore({
         triggerSnackbar({ commit }, payload) {
             commit('showSnackbar', payload);
         },
+
+        async fetchAvatars({ getters }) {
+            const response = await fetch(getters.getServerURL + '/users/avatars', {
+                method: 'GET',
+                credentials: 'include'
+            })
+
+            if (!response.ok) {
+                throw new Error('Failed to fetch avatars')
+            }
+
+            return await response.json()
+        },
+
+        async updateUserProfile({ getters, dispatch, commit }, profileData) {
+            const response = await fetch(getters.getServerURL + '/users/me', {
+                method: 'PUT',
+                credentials: 'include',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(profileData)
+            })
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error);
+                // throw new Error('Failed to update profile')
+            }
+
+            const result = await response.json()
+
+            // Update user in state if necessary
+            if (result.user) {
+                commit('setUser', result.user)
+            }
+
+            dispatch('triggerSnackbar', {
+                message: 'Profile updated successfully!',
+                type: 'success'
+            })
+
+            return result
+        }
     }
 });
 

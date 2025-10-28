@@ -104,6 +104,9 @@
         <v-switch v-model="defaultDisplay" label="Open by default" inset color="success" hide-details="true" class="py-0"></v-switch>
       </v-col>
       <v-col cols="auto">
+        <v-switch v-model="filterUser" label="Show my memos only" inset color="success" hide-details="true" class="py-0"></v-switch>
+      </v-col>
+      <v-col cols="auto">
         <v-switch v-model="useParams" label="Activate params (TODO)" inset color="success" hide-details="true" class="py-0"></v-switch>
       </v-col>
     </v-row>
@@ -156,7 +159,9 @@
             <v-btn @click="memo.display=!memo.display" :icon="memo.display ? 'mdi-chevron-down' : 'mdi-chevron-right'" variant="text" density="compact"></v-btn>
           </template>
           <template v-slot:subtitle>
-            <span class="v-card__subtitle">{{ memo.type_name }}</span>
+            <div class="d-flex align-center">
+              <span class="v-card__subtitle">{{ memo.type_name }}</span>
+            </div>
           </template>
           <v-card-text v-if="memo.display">
             <prism-editor class="my-editor" v-model="memo.content" :highlight="highlighterSQL" readonly></prism-editor>
@@ -176,17 +181,45 @@
                   <v-btn v-bind="props" color="success" icon="mdi-content-duplicate" @click="openMemoDialog('duplicate', memo)"></v-btn>
                 </template>
               </v-tooltip>
-              <v-tooltip text="Edit">
+              <v-tooltip text="Edit" v-if="memo.author_id == getUser.id">
                 <template v-slot:activator="{ props }">
                   <v-btn v-bind="props" color="warning" icon="mdi-pencil" @click="openMemoDialog('edit', memo)"></v-btn>
                 </template>
               </v-tooltip>
-              <v-tooltip text="Delete">
+              <v-tooltip text="Delete" v-if="memo.author_id == getUser.id">
                 <template v-slot:activator="{ props }">
                   <v-btn v-bind="props" color="error" icon="mdi-delete" @click="showDeleteDialog(memo.id)"></v-btn>
                 </template>
               </v-tooltip>
             </v-btn-group>
+            <v-spacer></v-spacer>
+            <div>
+              <v-tooltip :text="'Author: ' + memo.author_email" v-if="memo.author_id != getUser.id">
+                <template v-slot:activator="{ props }">
+                  <div v-bind="props" class="d-flex align-center author-compact">
+                    <v-icon small class="mr-1">mdi-account-edit</v-icon>
+                    <span class="text-caption">
+                      {{ getAuthorDisplayName(memo.author_username, memo.author_email) }}
+                    </span>
+                    <v-avatar :image="getAuthorAvatarUrl(memo.author_avatar)" size="16" class="mx-1"></v-avatar>
+                  </div>
+                </template>
+              </v-tooltip>
+              <span class="d-flex align-center author-compact" v-else><v-icon small class="mr-1">mdi-account-edit</v-icon> You
+                <v-icon color="red" class="ml-1">mdi-heart</v-icon>
+              </span>
+              <v-tooltip :text="'Last update: ' + formatDate(memo.updated_at)">
+                <template v-slot:activator="{ props }">
+                  <div v-bind="props" class="d-flex align-center author-compact">
+                    <v-icon small class="mr-1">mdi-clock-outline</v-icon>
+                    <span class="text-caption">
+                      {{ formatDateShort(memo.updated_at) }}
+                    </span>
+                  </div>
+                </template>
+              </v-tooltip>
+              <!-- <span class="d-flex align-center author-compact"><v-icon small class="mr-1">mdi-clock-outline</v-icon>{{ formatDate(memo.updated_at) }}</span> -->
+            </div>
             <v-spacer></v-spacer>
               <v-tooltip text="Copy to clipboard">
                 <template v-slot:activator="{ props }">
@@ -344,7 +377,7 @@ import { Editor, EditorContent } from '@tiptap/vue-3'
 import Placeholder from '@tiptap/extension-placeholder'
 import StarterKit from '@tiptap/starter-kit'
 import Underline from '@tiptap/extension-underline'
-import { mapGetters } from 'vuex';
+import { mapGetters, mapActions } from 'vuex';
 
 function stripHtml(html) {
   const tempDiv = document.createElement('div');
@@ -360,6 +393,7 @@ export default {
   data() {
     return {
       defaultDisplay: false,
+      filterUser: false,
       useParams: false,
       memos: [],  // Memo list
       categories: [], // Category list
@@ -373,6 +407,7 @@ export default {
         content: '',
         category_name: null,
         type_name: null,
+        author_id: '',
       },
       snackbar: false, // To display the snackbar
       snackbarMessage: '', // Snackbar's message
@@ -391,7 +426,7 @@ export default {
     };
   },
   computed: {
-    ...mapGetters(['getServerURL']),
+    ...mapGetters(['getServerURL','getUser']),
     filteredMemos() {
       let filtered = this.memos.filter(memo => {
         let search = "";
@@ -405,7 +440,10 @@ export default {
         const matchesType = this.selectedTypes.length === 0 ||
           this.selectedTypes.includes(memo.type_id);
 
-        return matchesSearch && matchesCategory && matchesType;
+        const matchesUser = !this.filterUser || 
+          (this.getUser && memo.author_id === this.getUser.id);
+                           
+        return matchesSearch && matchesCategory && matchesType && matchesUser;
       });
 
       return filtered;
@@ -415,11 +453,39 @@ export default {
     },
   },
   methods: {
+    ...mapActions(['setUser']),
+
     highlighterSQL(code) {
       return highlight(code, languages.sql);
     },
     highlighterHTML(code) {
       return highlight(code, languages.markup);
+    },
+
+    getAuthorAvatarUrl(filename) {
+      return `${this.getServerURL}/static/avatars/${filename || '0.png'}`;
+    },
+
+    getAuthorDisplayName(username, email) {
+      if (username && username.trim() !== '') {
+        return username;
+      }
+      // Retourne la partie avant le @ de l'email
+      return email ? email.split('@')[0] : 'Unknown';
+    },
+
+    async fetchCurrentUser() {
+      try {
+        const response = await fetch(this.getServerURL + '/users/me', {
+          credentials: 'include'
+        });
+        if (response.ok) {
+          const data = await response.json();
+          this.setUser(data.user);
+        }
+      } catch (error) {
+        console.error('Error fetching current user:', error);
+      }
     },
 
     async fetchCategories() {
@@ -443,6 +509,7 @@ export default {
         this.loadingCategories = false;
       }
     },
+
     async fetchTypes() {
       this.loadingTypes = true;
       try {
@@ -464,6 +531,7 @@ export default {
         this.loadingTypes = false;
       }
     },
+
     async fetchMemos() {
       this.loadingMemos = true;
       try {
@@ -504,6 +572,7 @@ export default {
         this.loadingMemos = false;
       }
     },
+
     updateSelectedFilters() {
       // Update selectedCategories
       const validCategoryIds = new Set(this.categories.map(category => category.id));
@@ -513,6 +582,7 @@ export default {
       const validTypeIds = new Set(this.types.map(type => type.id));
       this.selectedTypes = this.selectedTypes.filter(typeId => validTypeIds.has(typeId));
     },
+
     // In methods where you need to refresh data
     async refreshData() {
       try {
@@ -541,6 +611,7 @@ export default {
         throw error;
       }
     },
+
     async updateMemo() {
       try {
         const response = await fetch(this.getServerURL+`/memos/${this.currentMemoId}`, {
@@ -559,16 +630,12 @@ export default {
         throw error;
       }
     },
-    async submitMemo() {
-      // this.newMemo.description = this.newMemo.description.match(/<(\w+)><\/\1>/g) ? "" : this.newMemo.description;  // check empty markup
 
-      // let oldDescription = this.newMemo.description;
-      // if (oldDescription === this.defaultDescription)
-      //   this.newMemo.description = "";
+    async submitMemo() {
       this.submittingMemo = true; // Lock the button during treatment
 
       const descriptionText = stripHtml(this.newMemo.description).trim();
-      if (!descriptionText /*|| descriptionText === this.defaultDescription*/) {
+      if (!descriptionText) {
         this.newMemo.description = '';
       }
 
@@ -578,6 +645,8 @@ export default {
         this.snackbar = true;
         return;
       }
+
+      this.newMemo.author_id = this.getUser.id;
   
       try {
         if (this.memoDialogMode === 'add') {
@@ -623,6 +692,7 @@ export default {
       this.deleteDialog = true;
       this.currentMemoId = id;
     },
+
     async deleteMemo() {
       let id = this.currentMemoId;
       this.deleteDialog = false;
@@ -697,6 +767,7 @@ export default {
         this.selectedCategories.push(categoryId);
       }
     },
+
     toggleTypeSelection(typeId) {
       if (this.selectedTypes.includes(typeId)) {
         this.selectedTypes = this.selectedTypes.filter(id => id !== typeId);
@@ -745,6 +816,7 @@ export default {
       // Open the dialog
       this.memoDialog = true;
     },
+
     switchDescHTMLMode() {
       if (this.descHTMLMode)
         this.descHTMLMode = false;
@@ -752,12 +824,42 @@ export default {
         this.descHTMLMode = true;
         this.editor.commands.setContent(this.newMemo.description);
       }
-    }
+    },
+
+    formatDate(dateString) {
+      if (!dateString) return 'N/A';
+      const date = new Date(dateString);
+
+      return date.toLocaleString('fr-FR', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
+      }).replace(/ /, ' at ');
+    },
+
+    formatDateShort(dateString) {
+      if (!dateString) return 'N/A';
+      const date = new Date(dateString);
+
+      return date.toLocaleString('fr-FR', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
+      });
+    },
+
   },
-  mounted() {
-    this.fetchMemos();
-    this.fetchCategories();
-    this.fetchTypes();
+  async mounted() {
+    await this.fetchCurrentUser();
+
+    await this.fetchMemos();
+    await this.fetchCategories();
+    await this.fetchTypes();
 
     // Créer l'instance de l'éditeur Tiptap
     this.editor = new Editor({
@@ -930,4 +1032,19 @@ export default {
     height: 0;
     pointer-events: none;
   }
+  
+.author-compact {
+  font-size: 0.7em;
+  opacity: 0.7;
+  transition: opacity 0.2s ease;
+  margin-bottom: 2px;
+}
+
+.author-compact:hover {
+  opacity: 1;
+}
+
+.author-compact:last-child {
+  margin-bottom: 0;
+}
 </style>

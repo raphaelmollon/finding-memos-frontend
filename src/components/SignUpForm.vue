@@ -67,11 +67,11 @@ export default {
           credentials: 'include'  // include session cookie
         });
 
+        const data = await response.json();
         if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error);
+          throw new Error(data.error);
         }
-        const snackbarMessage = 'Sign up successful! You can now log in.';
+        const snackbarMessage = data.message || 'Sign up successful! You can now log in.';
         const snackbarType = 'success';
         this.triggerSnackbar({ message: snackbarMessage, type: snackbarType });
         this.$router.push('/signin');
