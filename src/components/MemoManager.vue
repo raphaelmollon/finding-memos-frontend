@@ -152,7 +152,11 @@
             <v-icon @click="memo.display=!memo.display">mdi-script-text</v-icon>
           </template>
           <template v-slot:title>
-            <span @click="memo.display=!memo.display" class="v-card__title">{{ memo.category_name + ' - ' + memo.name }}</span>
+            <v-tooltip :text="memo.category_name + ' - ' + memo.name" location="top">
+              <template v-slot:activator="{ props }">
+                <span v-bind="props" @click="memo.display=!memo.display" class="v-card__title">{{ memo.category_name + ' - ' + memo.name }}</span>
+              </template>
+            </v-tooltip>
           </template>
           <template v-slot:append>
             <v-btn @click="copyToClipboard(memo.content)" v-if="!memo.display" icon="mdi-content-copy" variant="text" density="compact" color="success"></v-btn>
@@ -160,7 +164,19 @@
           </template>
           <template v-slot:subtitle>
             <div class="d-flex align-center">
-              <span class="v-card__subtitle">{{ memo.type_name }}</span>
+              <span class="v-card__subtitle mr-2">{{ memo.type_name }}</span>
+              <v-progress-linear
+                v-if="memo.searchScore"
+                :model-value="(memo.searchScore/bestSearchScore*100)"
+                :color="getAccuracyColor(memo.searchScore)"
+                height="16"
+                width="60"
+                class="mr-2"
+              >
+                <template v-slot:default="{ value }">
+                  <span class="text-caption" :class="getAccuracyTextColor(value)">{{ getAccuracyDescription(value) }}</span>
+                </template>
+              </v-progress-linear>
             </div>
           </template>
           <v-card-text v-if="memo.display">
@@ -181,12 +197,12 @@
                   <v-btn v-bind="props" color="success" icon="mdi-content-duplicate" @click="openMemoDialog('duplicate', memo)"></v-btn>
                 </template>
               </v-tooltip>
-              <v-tooltip text="Edit" v-if="memo.author_id == getUser.id">
+              <v-tooltip text="Edit" v-if="getUser && memo.author_id == getUser.id">
                 <template v-slot:activator="{ props }">
                   <v-btn v-bind="props" color="warning" icon="mdi-pencil" @click="openMemoDialog('edit', memo)"></v-btn>
                 </template>
               </v-tooltip>
-              <v-tooltip text="Delete" v-if="memo.author_id == getUser.id">
+              <v-tooltip text="Delete" v-if="getUser && memo.author_id == getUser.id">
                 <template v-slot:activator="{ props }">
                   <v-btn v-bind="props" color="error" icon="mdi-delete" @click="showDeleteDialog(memo.id)"></v-btn>
                 </template>
@@ -194,7 +210,7 @@
             </v-btn-group>
             <v-spacer></v-spacer>
             <div>
-              <v-tooltip :text="'Author: ' + memo.author_email" v-if="memo.author_id != getUser.id">
+              <v-tooltip :text="'Author: ' + memo.author_email" v-if="getUser && memo.author_id != getUser.id">
                 <template v-slot:activator="{ props }">
                   <div v-bind="props" class="d-flex align-center author-compact">
                     <v-icon small class="mr-1">mdi-account-edit</v-icon>
@@ -401,6 +417,7 @@ export default {
       types: [],
       selectedTypes: [],
       searchTerm: '',
+      bestSearchScore: 0,
       newMemo: {
         name: '',
         description: '',
@@ -432,7 +449,67 @@ export default {
         let search = "";
         if (this.searchTerm !== null)
           search = this.searchTerm.toLowerCase();
-        const matchesSearch = memo.name.toLowerCase().includes(search);
+        
+        let matchesSearch = true;
+        let totalScore = 0;
+        
+        if (search !== "") {
+          const searchTerms = search.split(' ').filter(term => term.length > 2);
+          
+          if (searchTerms.length > 0) {
+            // Calculate score for each term
+            searchTerms.forEach(term => {
+              let termScore = 0;
+              
+              // Name = 4 points (most important)
+              if (memo.name.toLowerCase().includes(term)) {
+                termScore += 4;
+              }
+              
+              // Description = 2 points
+              if (memo.description && memo.description.toLowerCase().includes(term)) {
+                termScore += 2;
+              }
+              
+              // Content = 1 point
+              if (memo.content.toLowerCase().includes(term)) {
+                termScore += 1;
+              }
+              
+              totalScore += termScore;
+            });
+
+            // At least one term must bring points
+            matchesSearch = totalScore > 0;
+
+            // Calculate ideal theoric score
+            this.bestSearchScore = searchTerms.length * (4 + 2 + 1) + 5;
+          } else {
+            // Simple research if only small terms
+            let simpleScore = 0;
+            if (memo.name.toLowerCase().includes(search)) simpleScore += 4;
+            if (memo.description && memo.description.toLowerCase().includes(search)) simpleScore += 2;
+            if (memo.content.toLowerCase().includes(search)) simpleScore += 1;
+            
+            matchesSearch = simpleScore > 0;
+            totalScore = simpleScore;
+            this.bestSearchScore = 4 + 2 + 1;
+          }
+
+          const allTermsFound = searchTerms.length > 0 && 
+            searchTerms.every(term => 
+              memo.name.toLowerCase().includes(term) ||
+              (memo.description && memo.description.toLowerCase().includes(term)) ||
+              memo.content.toLowerCase().includes(term)
+            );
+            
+          if (allTermsFound) {
+            totalScore += 5; // Bonus for matching all terms
+          }
+        }
+
+        // Store total score for sorting
+        memo.searchScore = totalScore;
 
         const matchesCategory = this.selectedCategories.length === 0 ||
           this.selectedCategories.includes(memo.category_id);
@@ -442,12 +519,18 @@ export default {
 
         const matchesUser = !this.filterUser || 
           (this.getUser && memo.author_id === this.getUser.id);
-                           
+                              
         return matchesSearch && matchesCategory && matchesType && matchesUser;
       });
 
+      // SORT BY SCORE (decrescent)
+      if (this.searchTerm !== null && this.searchTerm !== "") {
+        filtered.sort((a, b) => (b.searchScore || 0) - (a.searchScore || 0));
+      }
+
       return filtered;
     },
+
     filteredMemosCount() {
       return this.filteredMemos.length;
     },
@@ -472,6 +555,34 @@ export default {
       }
       // Retourne la partie avant le @ de l'email
       return email ? email.split('@')[0] : 'Unknown';
+    },
+
+    getAccuracyColor(score) {
+      if (!this.bestSearchScore) return 'blue';
+      const percentage = (score / this.bestSearchScore) * 100;
+      
+      // Thème chaud/froid - du froid (bleu) au chaud (rouge)
+      if (percentage >= 80) return 'red';      // Excellent match
+      if (percentage >= 60) return 'orange';   // Good match 
+      if (percentage >= 40) return 'yellow';   // Fair match
+      if (percentage >= 20) return 'cyan';     // Weak match
+      return 'blue';                           // Very weak match
+    },
+
+    getAccuracyTextColor(percentage) {
+      if (percentage >= 80) return 'text-white';
+      if (percentage >= 60) return 'text-white';
+      if (percentage >= 40) return 'text-black';
+      if (percentage >= 20) return 'text-black';
+      return 'text-black';
+    },
+
+    getAccuracyDescription(percentage) {
+      if (percentage >= 80) return '🔥 Excellent match';
+      if (percentage >= 60) return '👍 Good match';
+      if (percentage >= 40) return '👌 Fair match';
+      if (percentage >= 20) return '💤 Weak match';
+      return '🥶 Very weak match';
     },
 
     async fetchCurrentUser() {
@@ -646,7 +757,7 @@ export default {
         return;
       }
 
-      this.newMemo.author_id = this.getUser.id;
+      this.newMemo.author_id = this.getUser ? this.getUser.id : null;
   
       try {
         if (this.memoDialogMode === 'add') {
@@ -1047,4 +1158,15 @@ export default {
 .author-compact:last-child {
   margin-bottom: 0;
 }
+
+.accuracy-bar {
+  border-radius: 4px;
+}
+
+.accuracy-percentage {
+  font-weight: 600;
+  min-width: 30px;
+  text-align: center;
+}
+
 </style>

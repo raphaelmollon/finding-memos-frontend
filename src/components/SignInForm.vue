@@ -53,7 +53,7 @@
               </a>
             </p>
           </v-card-text>
-          <v-card-actions>Still need help ? Ask RAM</v-card-actions>
+          <v-card-actions class="justify-center">Still need help ? Ask RAM</v-card-actions>
         </v-card>
       </v-col>
     </v-row>

@@ -33,19 +33,42 @@
             </div>
 
             <div v-else class="my-8">
-              <v-icon color="error" size="64" class="mb-4">mdi-alert-circle</v-icon>
-              <div class="text-h6 mb-2">Validation failed</div>
-              <p class="text-body-1">{{ errorMessage }}</p>
-              <p class="text-body-1 mt-2"><router-link to="/signin" class="primary text-decoration-none">Back to Sign in<v-icon icon="mdi-chevron-right"></v-icon></router-link></p>
-              <v-btn 
-                color="secondary" 
-                size="large" 
-                @click="retryValidation"
-                class="mt-4 ml-2"
-                v-if="canRetry"
-              >
-                Try Again
-              </v-btn>
+              <v-icon color="error" size="64" class="mb-4">mdi-shield-lock</v-icon>
+              <div class="text-h6 mb-2">Confirm your account</div>
+              <p class="text-body-1 mb-4">Please enter your password to activate your account</p>
+
+              <v-form @submit.prevent="validateEmail">
+                <v-text-field
+                  v-model="password"
+                  label="Password"
+                  type="password"
+                  required
+                  variant="outlined"
+                  class="mb-4"
+                  :error-messages="passwordErrors"
+                ></v-text-field>
+
+                <v-btn 
+                  type="submit"
+                  color="primary" 
+                  size="large" 
+                  block
+                  :loading="loading"
+                  :disabled="!password"
+                >
+                  Activate Account
+                </v-btn>
+              </v-form>
+
+              <div class="text-center mt-4">
+                <v-btn 
+                  text 
+                  color="secondary" 
+                  @click="$router.push('/signin')"
+                >
+                  Back to Sign In
+                </v-btn>
+              </div>
             </div>
           </v-card-text>
         </v-card>
@@ -59,7 +82,8 @@ export default {
   name: 'ValidateEmail',
   data() {
     return {
-      loading: true,
+      password: '',
+      loading: false,
       validationSuccess: false,
       errorMessage: '',
       canRetry: false,
@@ -69,15 +93,23 @@ export default {
   computed: {
     getServerURL() {
       return this.$store.state.serverURL
-    }
+    },
+    passwordErrors() {
+      if (!this.password) return ['Password is required']
+      return []
+    },
   },
   methods: {
     async validateEmail() {
+      this.loading = true;
       try {
         const response = await fetch(`${this.getServerURL}/auth/validate-email`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ token: this.token }),
+          body: JSON.stringify({
+            token: this.token,
+            password: this.password,
+          }),
           credentials: 'include'
         })
 
@@ -95,18 +127,14 @@ export default {
 
       } catch (error) {
         console.error('Email validation error:', error)
-        this.errorMessage = error.message
-        this.canRetry = true
+        this.$store.dispatch('triggerSnackbar', {
+                  message: error.message,
+                  type: 'error'
+        })
       } finally {
         this.loading = false
       }
     },
-    retryValidation() {
-      this.loading = true
-      this.errorMessage = ''
-      this.canRetry = false
-      this.validateEmail()
-    }
   },
   mounted() {
     // Récupérer le token depuis l'URL
@@ -114,13 +142,12 @@ export default {
     this.token = urlParams.get('token')
 
     if (!this.token) {
-      this.errorMessage = 'No validation token found in URL'
-      this.loading = false
-      this.canRetry = false
-      return
+      this.$store.dispatch('triggerSnackbar', {
+        message: 'No validation token found',
+        type: 'error'
+      })
+      this.$router.push('/signin')
     }
-
-    this.validateEmail()
   }
 }
 </script>
