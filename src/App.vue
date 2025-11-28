@@ -23,8 +23,10 @@
       </v-toolbar-title>
       <v-spacer></v-spacer>
       <v-toolbar-items v-if="!loading">
+        <v-btn v-if="isAuthenticated" :to="{ name: 'Memos' }">Memos</v-btn>
         <v-btn v-if="isAuthenticated" :to="{ name: 'Connections' }">Connections</v-btn>
-        <v-btn v-if="isAuthenticated" :to="{ name: 'Home' }">Memos</v-btn>
+        <v-btn v-if="isAuthenticated" :to="{ name: 'Procedures' }">Recovery Procedures</v-btn>
+        <v-btn v-if="isAuthenticated" :to="{ name: 'StringTools' }">String Tools</v-btn>
         <v-btn v-if="isAuthenticated && isSuperuser" :to="{ name: 'CategoriesTypes' }">Categories/Types</v-btn>
         <v-btn v-if="isAuthenticated && isSuperuser" :to="{ name: 'AdminPage' }">Administration</v-btn>
         <v-btn v-if="!isAuthenticated" :to="{ name: 'SignIn' }">Sign in</v-btn>
