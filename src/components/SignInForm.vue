@@ -62,6 +62,7 @@
 
 <script>
 import { mapActions, mapGetters } from 'vuex';
+
 export default {
   data() {
     return {
@@ -88,7 +89,7 @@ export default {
         const data = await response.json();
         if (!response.ok) throw new Error(`Invalid credentials: ${data.error}`);
         this.setUser(data.user);
-        this.triggerSnackbar({ message: 'Welcome back ' + data.user.email + '!'})
+        this.triggerSnackbar({ message: 'Welcome back ' + (data.user.username ? data.user.username : data.user.email) + '!'})
         this.$router.push('/');
       } catch (error) {
         console.error(error);

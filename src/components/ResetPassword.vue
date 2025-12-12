@@ -52,6 +52,8 @@
 </template>
 
 <script>
+import { mapActions } from 'vuex'
+
 export default {
   name: 'ResetPassword',
   data() {
@@ -72,20 +74,15 @@ export default {
     }
   },
   methods: {
+    ...mapActions(['triggerSnackbar']),
     async resetPassword() {
       if (!this.passwordsMatch) {
-        this.$store.dispatch('triggerSnackbar', {
-          message: 'Passwords do not match',
-          type: 'error'
-        })
+        this.triggerSnackbar({ message: 'Passwords do not match', type: 'error' });
         return
       }
 
       if (this.newPassword.length < 8) {
-        this.$store.dispatch('triggerSnackbar', {
-          message: 'Password must be at least 8 characters long',
-          type: 'error'
-        })
+        this.triggerSnackbar({ message: 'Password must be at least 8 characters long', type: 'error' });
         return
       }
 
@@ -106,19 +103,13 @@ export default {
           throw new Error(data.error || 'Failed to reset password')
         }
 
-        this.$store.dispatch('triggerSnackbar', {
-          message: data.message || 'Password reset successfully!',
-          type: 'success'
-        })
+        this.triggerSnackbar(data.message || 'Password reset successfully!');
 
         this.$router.push('/signin')
 
       } catch (error) {
         console.error('Reset password error:', error)
-        this.$store.dispatch('triggerSnackbar', {
-          message: error.message,
-          type: 'error'
-        })
+        this.triggerSnackbar({ message: error.message, type: 'error' });
       } finally {
         this.loading = false
       }
@@ -130,10 +121,7 @@ export default {
     this.token = urlParams.get('token')
 
     if (!this.token) {
-      this.$store.dispatch('triggerSnackbar', {
-        message: 'No reset token found in URL',
-        type: 'error'
-      })
+      this.triggerSnackbar({ message: 'No reset token found in URL', type: 'error' });
       this.$router.push('/signin')
     }
   }

@@ -1,22 +1,5 @@
 <template>
   <v-container fluid>
-    <v-snackbar v-model="snackbar" 
-      :timeout="snackbarType === 'success' ? 2000 : 5000" 
-      :color="snackbarType" 
-      location="top"
-    >
-      <template v-slot:actions>
-        <v-btn
-          color="white"
-          text
-          @click="snackbar = false"
-        >
-          <v-icon>mdi-close</v-icon>
-        </v-btn>
-      </template>
-      {{ snackbarMessage }}
-    </v-snackbar>
-
     <v-row>
       <v-col cols="12">
         <v-data-table
@@ -144,39 +127,32 @@
     </v-dialog>
 
     <!-- Delete Confirmation Dialog -->
-    <v-dialog v-model="deleteDialog" max-width="400px">
-      <v-card>
-        <v-card-title class="headline">Confirm Deletion</v-card-title>
-        <v-card-text>
-          Are you sure you want to delete user <strong>{{ editedUser.email }}</strong>?
-          This action cannot be undone.
-        </v-card-text>
-        <v-card-actions>
-          <v-spacer></v-spacer>
-          <v-btn color="grey" text @click="closeDeleteDialog">Cancel</v-btn>
-          <v-btn color="error" text @click="deleteUser" :loading="loading">Delete</v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
+    <DeleteDialog v-model="deleteDialog"
+      thingLabel="User" :thing="editedUser.email"
+      @confirm-delete="deleteUser"
+    />
   </v-container>
 </template>
 
 <script>
-import { mapGetters } from 'vuex';
+import { mapGetters, mapActions } from 'vuex';
+import DeleteDialog from './common/DeleteDialog.vue';
 
 export default {
+  name: 'AdminPage',
+  components: {
+    DeleteDialog,
+  },
   data() {
     return {
-      snackbar: false,
-      snackbarMessage: '',
-      snackbarType: '',
+      
       users: [],
       headers: [
         { title: 'ID', value: 'id', align: 'left', width: '80px' },
         { title: 'Email', value: 'email', align: 'left' },
         { title: 'Username', value: 'username', align: 'left' },
         { title: 'Status', value: 'status', align: 'left' },
-        { title: 'Admin', value: 'is_superuser', align: 'center', width: '100px' },
+        { title: 'Admin', value: 'is_superuser', align: 'left', width: '100px' },
         { title: 'Created', value: 'created_at', align: 'left' },
         { title: 'Updated', value: 'updated_at', align: 'left' },
         { title: 'Actions', value: 'actions', align: 'end', sortable: false, width: '180px' },
@@ -199,6 +175,7 @@ export default {
     ...mapGetters(['getServerURL'])
   },
   methods: {
+    ...mapActions(['triggerSnackbar']),
     async fetchUsers() {
       try {
         const response = await fetch(this.getServerURL + '/users', {
@@ -211,7 +188,7 @@ export default {
         this.users = data;
       } catch (error) {
         console.error('Error while retrieving users:', error);
-        this.showSnackbar('Failed to load users', 'error');
+        this.triggerSnackbar({message:'Failed to load users', type:'error'});
       }
     },
 
@@ -289,12 +266,12 @@ export default {
           throw new Error(errorData.error || 'Failed to update user');
         }
 
-        this.showSnackbar('User updated successfully', 'success');
+        this.triggerSnackbar('User updated successfully');
         this.fetchUsers();
         this.closeEditDialog();
       } catch (error) {
         console.error('Error updating user:', error);
-        this.showSnackbar(error.message, 'error');
+        this.triggerSnackbar({message:error.message, type:'error'});
       } finally {
         this.loading = false;
       }
@@ -319,10 +296,10 @@ export default {
           throw new Error(errorData.error || 'Failed to update admin status');
         }
 
-        this.showSnackbar(`Admin status ${user.is_superuser ? 'granted' : 'revoked'}`, 'success');
+        this.triggerSnackbar(`Admin status ${user.is_superuser ? 'granted' : 'revoked'}`);
       } catch (error) {
         console.error('Error toggling admin status:', error);
-        this.showSnackbar(error.message, 'error');
+        this.triggerSnackbar({message:error.message, type:'error'});
       }
     },
 
@@ -350,22 +327,16 @@ export default {
           throw new Error(errorData.error || 'Failed to delete user');
         }
 
-        this.showSnackbar('User deleted successfully', 'success');
+        this.triggerSnackbar('User deleted successfully');
         this.fetchUsers();
         this.closeDeleteDialog();
       } catch (error) {
         console.error('Error deleting user:', error);
-        this.showSnackbar(error.message, 'error');
+        this.triggerSnackbar({message:error.message, type:'error'});
       } finally {
         this.loading = false;
       }
     },
-
-    showSnackbar(message, type) {
-      this.snackbarMessage = message;
-      this.snackbarType = type;
-      this.snackbar = true;
-    }
   },
   async mounted() {
     await this.fetchCurrentUser();

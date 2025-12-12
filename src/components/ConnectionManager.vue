@@ -71,7 +71,7 @@
       <v-data-table
         :headers="headers"
         :items="filteredConnections"
-        :item-key="server_id"
+        item-key="id"
         density="compact"
         :items-per-page="50"
         fixed-header
@@ -268,7 +268,7 @@ export default {
     },
     flattenConnections(data) {
       const flattened = [];
-      
+      let id = 0;
       data.connections.forEach(company => {
         company.sites.forEach(site => {
           site.applications.forEach(application => {
@@ -276,6 +276,7 @@ export default {
               server.urls.forEach(url => {
                 // Créer un objet plat pour chaque application
                 const flatEntry = {
+                  id: id++,
                   // Niveau entreprise
                   company_name: company.company_name,
                   
@@ -609,7 +610,7 @@ export default {
     this.loadingConnections = true;
     try {
       const response = await fetch('/connections.json');
-      console.log(response);
+      // console.log(response);
       const data = await response.json();
 
       this.connections = data.connections;

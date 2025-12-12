@@ -82,6 +82,7 @@
 
 <script>
 import AvatarSelector from './AvatarSelector.vue'
+import { mapActions } from 'vuex'
 
 export default {
   name: 'EditProfileDialog',
@@ -107,6 +108,7 @@ export default {
     }
   },
   methods: {
+    ...mapActions(['triggerSnackbar']),
     openDialog() {
       this.editedUser = { ...this.user }
       this.passwordData = {
@@ -165,10 +167,7 @@ export default {
         this.$emit('profile-updated')
         this.closeDialog()
       } catch (error) {
-        this.$store.dispatch('triggerSnackbar', {
-          message: error.message,
-          type: 'error'
-        })
+        this.triggerSnackbar({message: error.message, type: 'error'});
       } finally {
         this.loading = false
       }

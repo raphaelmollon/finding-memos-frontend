@@ -1,22 +1,5 @@
 <template>
   <v-container fluid>
-    <v-snackbar v-model="snackbar" 
-      :timeout="snackbarType === 'success' ? 2000 : 5000" 
-      :color="snackbarType" 
-      location="top"
-    >
-      <template v-slot:actions>
-        <v-btn
-          color="white"
-          text
-          @click="snackbar = false"
-        >
-          <v-icon>mdi-close</v-icon>
-        </v-btn>
-      </template>
-      {{ snackbarMessage }}
-    </v-snackbar>
-
     <v-row justify="center">
       <v-col cols="6">
         <v-card
@@ -46,8 +29,8 @@
 </template>
 
 <script>
-import { mapGetters } from 'vuex';
-import EditProfileDialog from './EditProfileDialog.vue';
+import { mapGetters, mapActions } from 'vuex';
+import EditProfileDialog from './profile/EditProfileDialog.vue';
 
 export default {
   components: {
@@ -55,9 +38,6 @@ export default {
   },
   data() {
     return {
-      snackbar: false,
-      snackbarMessage: '',
-      snackbarType: '',
       dialog: false,
       editedProp: {},
       user: {},
@@ -67,6 +47,7 @@ export default {
     ...mapGetters(['getServerURL'])
   },
   methods: {
+    ...mapActions(['triggerSnackbar']),
     getUserAvatarUrl(filename) {
       // console.log(`${this.getServerURL}/static/avatars/${filename || '0.png'}`)
       return `${this.getServerURL}/static/avatars/${filename || '0.png'}`
@@ -103,13 +84,9 @@ export default {
 
       try {
         this.dialog = false;
-        this.snackbarType = 'success';
-        this.snackbar = true;
-
+        this.triggerSnackbar('Your modiciations have been saved!');
       } catch (error) {
-        this.snackbarMessage = error.message;
-        this.snackbarType = 'error';
-        this.snackbar = true;
+        this.triggerSnackbar({ message: error.message, type: 'error' });
       }
     },
   },

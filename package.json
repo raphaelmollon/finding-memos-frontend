@@ -16,6 +16,7 @@
     "@tiptap/vue-3": "^2.9.1",
     "core-js": "^3.8.3",
     "highlight.js": "^11.10.0",
+    "lodash": "^4.17.21",
     "prismjs": "^1.29.0",
     "prismjs-themes": "^2.0.0",
     "roboto-fontface": "*",

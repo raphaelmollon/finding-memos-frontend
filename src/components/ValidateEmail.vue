@@ -78,6 +78,8 @@
 </template>
 
 <script>
+import { mapActions } from 'vuex'
+
 export default {
   name: 'ValidateEmail',
   data() {
@@ -100,6 +102,7 @@ export default {
     },
   },
   methods: {
+    ...mapActions(['triggerSnackbar']),
     async validateEmail() {
       this.loading = true;
       try {
@@ -120,17 +123,11 @@ export default {
         }
 
         this.validationSuccess = true
-        this.$store.dispatch('triggerSnackbar', {
-          message: data.message || 'Email validated successfully!',
-          type: 'success'
-        })
+        this.triggerSnackbar(data.message || 'Email validated successfully!');
 
       } catch (error) {
         console.error('Email validation error:', error)
-        this.$store.dispatch('triggerSnackbar', {
-                  message: error.message,
-                  type: 'error'
-        })
+        this.triggerSnackbar({ message: error.message, type: 'error' });
       } finally {
         this.loading = false
       }
@@ -142,10 +139,7 @@ export default {
     this.token = urlParams.get('token')
 
     if (!this.token) {
-      this.$store.dispatch('triggerSnackbar', {
-        message: 'No validation token found',
-        type: 'error'
-      })
+      this.triggerSnackbar({ message: 'No validation token found', type: 'error' });
       this.$router.push('/signin')
     }
   }

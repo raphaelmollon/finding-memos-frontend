@@ -1,115 +1,46 @@
 <template>
   <v-container fluid>
-    <v-snackbar v-model="snackbar" 
-      :timeout="snackbarType === 'success' ? 2000 : 5000" 
-      :color="snackbarType" 
-      location="top"
-    >
-      <template v-slot:actions>
-        <v-btn
-          color="white"
-          text
-          @click="snackbar = false"
-        >
-          <v-icon>mdi-close</v-icon>
-        </v-btn>
-      </template>
-      {{ snackbarMessage }}
-    </v-snackbar>
-
     <!-- Category Selection -->
-    <v-row>
-      <v-col cols="12" class="d-flex align-center flex-wrap justify-center" v-if="loadingTypes">
-        <v-btn v-for="i in 10" :key="i" variant="tonal" tile :loading="true" size="x-large" class="mx-1" disabled></v-btn>
-      </v-col>
-      <v-col cols="12" class="d-flex align-center flex-wrap justify-center" v-else>
-        <!-- Reset selection -->
-        <v-btn
-          @click="selectedCategories = []"
-          :color="selectedCategories.length === 0 ? 'primary' : ''"
-          :variant="selectedCategories.length === 0 ? 'tonal' : 'plain'"
-          :active="selectedCategories.length === 0"
-          tile
-          size="x-large"
-        >
-          All Categories
-        </v-btn>
-
-        <!-- List all selectable categories -->
-        <v-btn
-          v-for="category in categories"
-          :key="category.id"
-          @click="toggleCategorySelection(category.id)"
-          :color="selectedCategories.includes(category.id) ? 'primary' : ''"
-          :variant="selectedCategories.includes(category.id) ? 'tonal' : 'plain'"
-          :active="selectedCategories.includes(category.id)"
-          tile
-          size="x-large"
-        >
-          {{ category.name }}
-        </v-btn>
-      </v-col>
-    </v-row>
+    <FilterAsMenu
+      :items="categories"
+      :selected-items="selectedCategories"
+      :loading="loadingCategories"
+      :loading-count="10"
+      itemSize="x-large"
+      all-label="All Categories"
+      @reset-items="selectedCategories = []"
+      @toggle-item="toggleCategorySelection"
+    />
 
     <!-- Type Selection -->
-    <v-row>
-      <v-col cols="12" class="d-flex align-center flex-wrap justify-center" v-if="loadingCategories">
-        <v-btn v-for="i in 5" :key="i" variant="tonal" tile :loading="true" class="mx-1" disabled></v-btn>
-      </v-col>
-      <v-col cols="12" class="d-flex align-center flex-wrap justify-center" v-else>
-        <!-- Reset selection -->
-        <v-btn
-          @click="selectedTypes = []"
-          :color="selectedTypes.length === 0 ? 'primary' : ''"
-          :variant="selectedTypes.length === 0 ? 'tonal' : 'plain'"
-          :active="selectedTypes.length === 0"
-          tile
-        >
-          All Types
-        </v-btn>
-
-        <!-- List all selectable types -->
-        <v-btn
-          v-for="type in types"
-          :key="type.id"
-          @click="toggleTypeSelection(type.id)"
-          :color="selectedTypes.includes(type.id) ? 'primary' : ''"
-          :variant="selectedTypes.includes(type.id) ? 'tonal' : 'plain'"
-          :active="selectedTypes.includes(type.id)"
-          tile
-        >
-          {{ type.name }}
-        </v-btn>
-      </v-col>
-    </v-row>
+    <FilterAsMenu
+      :items="types"
+      :selected-items="selectedTypes"
+      :loading="loadingTypes"
+      :loading-count="10"
+      itemSize="large"
+      all-label="All Types"
+      @reset-items="selectedTypes = []"
+      @toggle-item="toggleTypeSelection"
+    />
 
     <!-- Search bar -->
-    <v-row>
-      <v-col cols="12" offset-xl="3" xl="6" offset-lg="2" lg="8" offset-md="1" md="10" class="my-0 pb-0">
-        <v-text-field
-          v-model="searchTerm"
-          placeholder="Search"
-          prepend-inner-icon="mdi-magnify"
-          variant="outlined"
-          hint="Research looks into names"
-          hide-details="true"
-          clearable
-        ></v-text-field>
-      </v-col>
-    </v-row>
+    <SearchBar v-model="searchTerm" 
+      hintValue="Search into names, descriptions and content. 
+        Accept multi terms and sort by accuracy." 
+      v-if="!loadingMemos"/>
 
     <!-- Options -->
-    <v-row class="align-content-center justify-center">
-      <v-col cols="auto" class="align-content-center justify-center">
-        <v-switch v-model="defaultDisplay" label="Open by default" inset color="success" hide-details="true" class="py-0"></v-switch>
-      </v-col>
-      <v-col cols="auto">
-        <v-switch v-model="filterUser" label="Show my memos only" inset color="success" hide-details="true" class="py-0"></v-switch>
-      </v-col>
-      <v-col cols="auto">
-        <v-switch v-model="useParams" label="Activate params (TODO)" inset color="success" hide-details="true" class="py-0"></v-switch>
-      </v-col>
-    </v-row>
+    <PreferencesPanel 
+      :default-display="defaultDisplay"
+      :filter-user="filterUser"
+      :use-params="useParams"
+      :saving-preferences="savingPreferences"
+      @update:defaultDisplay="handlePreferenceChange('defaultDisplay', $event)"
+      @update:filterUser="handlePreferenceChange('filterUser', $event)"
+      @update:useParams="handlePreferenceChange('useParams', $event)"
+      v-if="!loadingMemos"
+    />
 
     <!-- Nb memos + Btn Add -->
     <v-row v-if="!loadingMemos">
@@ -204,7 +135,7 @@
               </v-tooltip>
               <v-tooltip text="Delete" v-if="getUser && memo.author_id == getUser.id">
                 <template v-slot:activator="{ props }">
-                  <v-btn v-bind="props" color="error" icon="mdi-delete" @click="showDeleteDialog(memo.id)"></v-btn>
+                  <v-btn v-bind="props" color="error" icon="mdi-delete" @click="showDeleteDialog(memo.id, memo.name)"></v-btn>
                 </template>
               </v-tooltip>
             </v-btn-group>
@@ -248,15 +179,10 @@
     </v-row>
 
     <!-- Delete Dialog -->
-    <v-dialog v-model="deleteDialog" width="auto">
-      <v-card class="ma-2">
-        <v-card-title>Are you sure you want to delete this memo?</v-card-title>
-        <v-card-actions>
-          <v-btn color="green darken-1" text @click="deleteDialog = false">Cancel</v-btn>
-          <v-btn color="red darken-1" text @click="deleteMemo">Delete</v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
+    <DeleteDialog v-model="deleteDialog" 
+      thingLabel="Memo" :thing="currentMemoName"
+      @confirm-delete="deleteMemo" 
+    />
 
     <!-- Add/Update Dialog -->
     <v-dialog v-model="memoDialog" max-width="80%">
@@ -395,6 +321,14 @@ import StarterKit from '@tiptap/starter-kit'
 import Underline from '@tiptap/extension-underline'
 import { mapGetters, mapActions } from 'vuex';
 
+import { preferences } from '@/plugins/preferences';
+import _ from 'lodash';
+
+import SearchBar from './common/SearchBar.vue';
+import PreferencesPanel from './memo/PreferencesPanel.vue';
+import FilterAsMenu from './common/FilterAsMenu.vue';
+import DeleteDialog from './common/DeleteDialog.vue';
+
 function stripHtml(html) {
   const tempDiv = document.createElement('div');
   tempDiv.innerHTML = html;
@@ -402,9 +336,14 @@ function stripHtml(html) {
 }
 
 export default {
+  name: 'MemoManager',
   components: {
     PrismEditor,
     TiptapEditor: EditorContent,
+    SearchBar,
+    PreferencesPanel,
+    FilterAsMenu,
+    DeleteDialog,
   },
   data() {
     return {
@@ -426,20 +365,19 @@ export default {
         type_name: null,
         author_id: '',
       },
-      snackbar: false, // To display the snackbar
-      snackbarMessage: '', // Snackbar's message
-      snackbarType: 'success', // Default color for snackbar ('success' or 'error')
       deleteDialog: false,    // To display the Delete Memo Dialog
       currentMemoId: null,    // Memo ID for modification/suppression
+      currentMemoName: '',    // Memo Name for deletion confirmation
       memoDialog: false,      // To display the Memo Form Dialog
       memoDialogMode: 'add',       // 'add' or 'edit' to determiner current action
       editor: null,
       defaultDescription: "You can give some description/instructions here...",
       descHTMLMode: true,
-      loadingMemos: false,
-      loadingCategories: false,
-      loadingTypes: false,
+      loadingMemos: true,
+      loadingCategories: true,
+      loadingTypes: true,
       submittingMemo: false,
+      savingPreferences: false,
     };
   },
   computed: {
@@ -536,7 +474,7 @@ export default {
     },
   },
   methods: {
-    ...mapActions(['setUser']),
+    ...mapActions(['setUser', 'triggerSnackbar']),
 
     highlighterSQL(code) {
       return highlight(code, languages.sql);
@@ -598,6 +536,29 @@ export default {
         console.error('Error fetching current user:', error);
       }
     },
+
+    async handlePreferenceChange(preference, value) {
+      this[preference] = value;
+      await this.saveUserPreferences();
+    },
+    saveUserPreferences: _.debounce(async function() {
+      // Update just the memos section in user's preferences
+      try {
+        this.savingPreferences = true;
+        const response = await preferences.updateSection(this.getServerURL, 'memos', {
+          onlyMine: this.filterUser,
+          openByDefault: this.defaultDisplay,
+          useParams: this.useParams,
+        });
+        if (response.ok) {
+          this.triggerSnackbar("Preferences saved!");
+        }
+      } catch (error) {
+        this.triggerSnackbar({message: "Error: " + error, type:'error'});
+      } finally {
+        this.savingPreferences = false;
+      }
+    },500),
 
     async fetchCategories() {
       this.loadingCategories = true;
@@ -751,9 +712,7 @@ export default {
       }
 
       if (!this.newMemo.name || !this.newMemo.content || !this.newMemo.category_name || !this.newMemo.type_name) {
-        this.snackbarMessage = "Please fill in all required fields.";
-        this.snackbarType = 'error';
-        this.snackbar = true;
+        this.triggerSnackbar({ message: "Please fill in all required fields.", type: 'error' });
         return;
       }
 
@@ -772,16 +731,11 @@ export default {
         this.newMemo = { name: '', description: '', content: '', category_name: '', type_name: '' }; // Reset the form
 
         // Display a success message
-        this.snackbarMessage = this.memoDialogMode === 'add' ? 'Memo added successfully !' : 'Memo updated successfully !';
-        this.snackbarType = 'success';
-        this.snackbar = true;
-
+        this.triggerSnackbar(this.memoDialogMode === 'add' ? 'Memo added successfully !' : 'Memo updated successfully !');
       } catch (error) {
         // If something wrong happened
         console.error("Error while submitting memo :", error);
-        this.snackbarMessage = "An error occured. Please check your information. More details in the console.";
-        this.snackbarType = 'error';
-        this.snackbar = true;
+        this.triggerSnackbar({ message: "An error occured. Please check your information. More details in the console.", type: 'error' });
 
         // We don't close the dialog, instead we redisplay the same old form
         // this.newMemo.description = !descriptionText ? this.defaultDescription : this.newMemo.description;
@@ -792,16 +746,15 @@ export default {
           await this.refreshData();
         } catch (error) {
           // Normally the error is already logged, but let's display a clear message
-          this.snackbarMessage = error;
-          this.snackbarType = 'error';
-          this.snackbar = true;
+        this.triggerSnackbar({ message: error, type: 'error' });
         }
       }
     },
 
-    showDeleteDialog(id) {
+    showDeleteDialog(id, name) {
       this.deleteDialog = true;
       this.currentMemoId = id;
+      this.currentMemoName = name;
     },
 
     async deleteMemo() {
@@ -813,9 +766,7 @@ export default {
           credentials: 'include'  // include session cookie
         });
         // Display a success message
-        this.snackbarMessage = 'Memo deleted successfully !';
-        this.snackbarType = 'success';
-        this.snackbar = true;
+        this.triggerSnackbar('Memo deleted successfully !');
 
         if (!response.ok) {
           const errorData = await response.json();
@@ -824,9 +775,7 @@ export default {
         await this.refreshData();
       } catch (error) {
         console.error("Error while deleting memo :", error);
-        this.snackbarMessage = error;
-        this.snackbarType = 'error';
-        this.snackbar = true;
+        this.triggerSnackbar({ message: error, type: 'error' });
       }
     },
 
@@ -835,16 +784,11 @@ export default {
         // Utiliser l'API clipboard si disponible
         navigator.clipboard.writeText(content)
           .then(() => {
-            this.snackbarMessage = "Memo copied to clipboard!";
-            this.snackbarType = 'success';
+            this.triggerSnackbar("Memo copied to clipboard!");
           })
           .catch(err => {
             console.error("Error while copying memo to clipboard: ", err);
-            this.snackbarMessage = "Memo couldn't be copied.";
-            this.snackbarType = 'error';
-          })
-          .finally(() => {
-            this.snackbar = true;
+            this.triggerSnackbar({ message: "Memo couldn't be copied.", type: 'error' });
           });
       } else {
         // Fallback pour les navigateurs qui ne supportent pas l'API
@@ -858,15 +802,12 @@ export default {
         textArea.select();
         try {
           document.execCommand('copy');
-          this.snackbarMessage = "Memo copied to clipboard!";
-          this.snackbarType = 'success';
+          this.triggerSnackbar("Memo copied to clipboard!");
         } catch (err) {
           console.error("Error while copying memo to clipboard: ", err);
-          this.snackbarMessage = "Memo couldn't be copied.";
-          this.snackbarType = 'error';
+          this.triggerSnackbar({ message: "Memo couldn't be copied.", type: 'error' });
         } finally {
           document.body.removeChild(textArea);
-          this.snackbar = true;
         }
       }
     },
@@ -971,6 +912,12 @@ export default {
     await this.fetchMemos();
     await this.fetchCategories();
     await this.fetchTypes();
+
+    // Load just the memos preferences
+    const memosPrefs = await preferences.getSection(this.getServerURL, 'memos');
+    this.filterUser = memosPrefs.onlyMine || false;
+    this.defaultDisplay = memosPrefs.openByDefault || false;
+    this.useParams = memosPrefs.useParams || false;
 
     // Créer l'instance de l'éditeur Tiptap
     this.editor = new Editor({

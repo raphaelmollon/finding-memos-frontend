@@ -1,22 +1,5 @@
 <template>
   <v-container fluid>
-    <v-snackbar v-model="snackbar" 
-      :timeout="snackbarType === 'success' ? 2000 : 5000" 
-      :color="snackbarType" 
-      location="top"
-    >
-      <template v-slot:actions>
-        <v-btn
-          color="white"
-          text
-          @click="snackbar = false"
-        >
-          <v-icon>mdi-close</v-icon>
-        </v-btn>
-      </template>
-      {{ snackbarMessage }}
-    </v-snackbar>
-
     <v-row>
         <v-col cols="12">
             <p>
@@ -60,6 +43,7 @@
           </template>
         </v-data-table>
       </v-col>
+
       <!-- Types -->
       <v-col cols="12" md="6">
         <v-data-table
@@ -122,7 +106,7 @@
 </template>
 
 <script>
-import { mapGetters } from 'vuex';
+import { mapGetters, mapActions } from 'vuex';
 
 export default {
   data() {
@@ -138,15 +122,13 @@ export default {
       searchT: '',
       dialog: false,
       editedProp: {},
-      snackbar: false,
-      snackbarMessage: '',
-      snackbarType: '',
     };
   },
   computed: {
     ...mapGetters(['getServerURL'])
   },
   methods: {
+    ...mapActions(['triggerSnackbar']),
     async fetchCategories() {
       try {
         const response = await fetch(this.getServerURL+'/categories', {
@@ -193,22 +175,17 @@ export default {
           case 'category':
             await this.saveCategory();
             this.fetchCategories();
-            this.snackbarMessage = 'Category renamed successfully!';
+            this.triggerSnackbar('Category renamed successfully!');
             break;
           case 'type':
             await this.saveType();
             this.fetchTypes();
-            this.snackbarMessage = 'Type renamed successfully!';
+            this.triggerSnackbar('Type renamed successfully!');
             break;
         }
         this.dialog = false;
-        this.snackbarType = 'success';
-        this.snackbar = true;
-
       } catch (error) {
-        this.snackbarMessage = error.message;
-        this.snackbarType = 'error';
-        this.snackbar = true;
+        this.triggerSnackbar({ message: error.message, type: 'error' });
       }
     },
 
@@ -228,9 +205,7 @@ export default {
         }
       } catch (error) {
         console.error('Failed while updating category:', error);
-        this.snackbarMessage = error.message;
-        this.snackbarType = 'error';
-        this.snackbar = true;
+        this.triggerSnackbar({ message: error.message, type: 'error' });
       }
     },
     async saveType() {
@@ -249,9 +224,7 @@ export default {
         }
       } catch (error) {
         console.error('Failed while updating type:', error);
-        this.snackbarMessage = error.message;
-        this.snackbarType = 'error';
-        this.snackbar = true;
+        this.triggerSnackbar({ message: error.message, type: 'error' });
       }
     },
   },

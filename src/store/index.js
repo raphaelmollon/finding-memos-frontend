@@ -3,9 +3,11 @@ import { createStore } from 'vuex';
 const store = createStore({
     state: {
         user: null,
-        snackbar: false,
-        snackbarMessage: '',
-        snackbarType: 'success', // 'success', 'error', etc.
+        snackbar: {
+            show: false,
+            message: '',
+            type: 'success', // 'success', 'error', etc.
+        },
         serverURL: process.env.VUE_APP_API_URL,
         environment: process.env.VUE_APP_ENV,
     },
@@ -15,6 +17,7 @@ const store = createStore({
         getUser: state => state.user,
         getServerURL: state => state.serverURL,
         isDevelopment: (state) => state.environment === 'development',
+        getSnackbar: (state) => state.snackbar,
     },
     mutations: {
         setUser(state, user) {
@@ -24,14 +27,11 @@ const store = createStore({
             state.user = null;
         },
         showSnackbar(state, { message, type = 'success' }) {
-            state.snackbar = true;
-            state.snackbarMessage = message;
-            state.snackbarType = type;
+            state.snackbar = { show: true, message: message, type: type };
         },
         hideSnackbar(state) {
-            state.snackbar = false;
-            state.snackbarMessage = '';
-            state.snackbarType = 'success';
+            state.snackbar.show = false;
+            state.snackbar.message = '';
         },
     },
     actions: {
@@ -55,14 +55,22 @@ const store = createStore({
                     commit('showSnackbar', { message: 'Woops! Where have you been? You need to sign in again.', type: 'error' });
                     commit('clearUser');
                 } else {
+                    // commit('showSnackbar', { message: 'Woops! Something went wrong... Try to sign in again.', type: 'error' });
                     throw new Error('Failed to validate session');
                 }
             } catch (error) {
                 commit('clearUser');
             }
         },
-        triggerSnackbar({ commit }, payload) {
-            commit('showSnackbar', payload);
+        triggerSnackbar({ commit }, payload = '') {
+            if (typeof payload === 'string') {
+                if (payload)
+                    commit('showSnackbar', { message: payload })
+                else    // empty payload => hide
+                    commit('hideSnackbar');
+            } else {
+                commit('showSnackbar', payload)
+            }
         },
 
         async fetchAvatars({ getters }) {

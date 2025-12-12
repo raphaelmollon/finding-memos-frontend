@@ -1,30 +1,37 @@
 <template>
-  <v-container fluid>
-    <v-snackbar v-model="snackbar" 
-      :timeout="snackbarType === 'success' ? 2000 : 5000" 
-      :color="snackbarType" 
-      location="top"
-    >
-      <template v-slot:actions>
-        <v-btn
-          color="white"
-          text
-          @click="snackbar = false"
-        >
-          <v-icon>mdi-close</v-icon>
-        </v-btn>
-      </template>
-      {{ snackbarMessage }}
-    </v-snackbar>
-
+  <v-container v-if="loading" class="d-flex align-center justify-center" style="min-height: 300px;">
+    <v-progress-circular indeterminate size="64" color="light-blue"></v-progress-circular>
+  </v-container>
+  <v-container fluid v-else>
     <v-row>
-      <v-col>
+      <v-col cols="12" md="6">
         <v-card>
           <v-card-title>
             <span class="text-h5">Text Input</span>
           </v-card-title>
 
-          <v-card-text>
+          <v-card-text class="mb-0 pb-0">
+            <!-- Separator selector (insert before the <v-form>) -->
+            <v-chip-group v-model="selectedSeparators"
+              multiple column>
+              <v-chip v-for="sep in separators" :key="sep.key"
+                label
+                color="primary"
+                :value="sep.key"
+                @click="saveUserPreferences"
+              >
+                <v-tooltip location="bottom" activator="parent">
+                  <span v-html="sep.tooltip"></span>
+                </v-tooltip>
+                <template v-if="sep.icon">
+                  <v-icon>{{ sep.icon }}</v-icon>
+                </template>
+                <template v-else>
+                  {{ sep.label }}
+                </template>
+              </v-chip>
+            </v-chip-group>
+
             <v-form @submit.prevent="">
               <v-textarea
                 v-model="text.origin"
@@ -36,6 +43,7 @@
                 prepend-inner-icon=""
                 @click:prepend-inner="pasteClipboard('text.origin')"
                 class="textarea-common"
+                :hide-details="true"
               >
                 <template v-slot:prepend-inner>
                   <v-tooltip text="Click to Paste or use Ctrl+V" location="top">
@@ -48,12 +56,13 @@
             </v-form>
           </v-card-text>
 
-          <v-card-actions>
+          <v-card-actions class="mt-0 pt-0">
             <v-spacer></v-spacer>
+          <v-responsive>
             <v-tooltip text="Format text to Lowercase" location="top" offset="0">
               <template v-slot:activator="{props}">
                 <v-btn v-bind="props"
-                  color="blue-darken-1" text @click="reformatAsLowerCase" :disabled="!text.origin || submittingText" :loading="submittingText"
+                  color="blue-darken-1" text @click="reformatCase(false)" :disabled="!text.origin || submittingText" :loading="submittingText"
                   icon="mdi-format-letter-case-lower">
                 </v-btn>
               </template>
@@ -61,7 +70,7 @@
             <v-tooltip text="Format text to Uppercase" location="top" offset="0">
               <template v-slot:activator="{props}">
                 <v-btn v-bind="props"
-                  color="blue-darken-2" text @click="reformatAsUpperCase" :disabled="!text.origin || submittingText" :loading="submittingText"
+                  color="blue-darken-2" text @click="reformatCase(true)" :disabled="!text.origin || submittingText" :loading="submittingText"
                   icon="mdi-format-letter-case-upper">
                 </v-btn>
               </template>
@@ -70,7 +79,7 @@
             <v-tooltip text="Format text to list of Numbers" location="top" offset="0">
               <template v-slot:activator="{props}">
                 <v-btn v-bind="props"
-                  color="amber-darken-1" text @click="reformatListOfNumbers" :disabled="!text.origin || submittingText" :loading="submittingText"
+                  color="amber-darken-1" text @click="callFormatList('number')" :disabled="!text.origin || submittingText" :loading="submittingText"
                   icon="mdi-format-list-numbered">
                 </v-btn>
               </template>
@@ -78,16 +87,8 @@
             <v-tooltip text="Format text to list of Strings" location="top" offset="0">
               <template v-slot:activator="{props}">
                 <v-btn v-bind="props"
-                  color="amber-darken-2" text @click="reformatListOfStrings" :disabled="!text.origin || submittingText" :loading="submittingText"
+                  color="amber-darken-2" text @click="callFormatList" :disabled="!text.origin || submittingText" :loading="submittingText"
                   icon="mdi-format-list-bulleted">
-                </v-btn>
-              </template>
-            </v-tooltip>
-            <v-tooltip text="Format text to list of Quoted Strings" location="top" offset="0">
-              <template v-slot:activator="{props}">
-                <v-btn v-bind="props"
-                  color="amber-darken-3" text @click="reformatListOfQuotedStrings" :disabled="!text.origin || submittingText" :loading="submittingText"
-                  icon="mdi-format-list-bulleted-square">
                 </v-btn>
               </template>
             </v-tooltip>
@@ -116,6 +117,7 @@
                 </v-btn>
               </template>
             </v-tooltip>
+
             <v-tooltip text="Clean text from duplicates lines" location="top" offset="0">
               <template v-slot:activator="{props}">
                 <v-btn v-bind="props"
@@ -124,49 +126,63 @@
                 </v-btn>
               </template>
             </v-tooltip>
+            </v-responsive>
           </v-card-actions>
         </v-card>
       </v-col>
 
 
-      <v-col>
+      <v-col cols="12" md="6">
         <v-card>
           <v-card-title>
             <span class="text-h5">Text Output</span>
           </v-card-title>
 
-          <v-card-text>
+          <v-card-text class="mb-0 pb-0">
+          <div class="d-inline-flex align-center flex-wrap">
+            <v-chip-group v-model="selectedFormatters"
+              multiple column class="d-flex flex-wrap">
+              <v-chip v-for="f in formatters" :key="f.key"
+                label
+                color="primary"
+                :value="f.key"
+                @click="saveUserPreferences"
+              >
+                <v-tooltip location="bottom" activator="parent">
+                  <span v-html="f.tooltip"></span>
+                </v-tooltip>
+                <template v-if="f.icon">
+                  <v-icon>{{ (f.iconOff && !selectedFormatters.includes(f.key)) ? f.iconOff : f.icon }}</v-icon>
+                </template>
+                <template v-else>
+                  {{ f.label }}
+                </template>
+              </v-chip>
+            </v-chip-group>
+            <!-- Reset all formatters -->
+            <v-chip label :color="selectedFormatters.length ? 'red' : ''" 
+              @click="selectedFormatters = []; saveUserPreferences()">
+              <v-tooltip location='bottom' activator="parent">Clear all</v-tooltip>
+              <v-icon>mdi-eraser</v-icon>
+            </v-chip>
+            </div>
             <v-textarea
               v-model="formattedTextDestination"
               variant="outlined"
               label=""
               readonly="readonly"
               class="textarea-common"
+              :hide-details="true"
+              :loading="submittingText"
             >
-                <template v-slot:prepend-inner><div>
-                  <v-tooltip text="Toggle IN ()" location="top">
-                    <template v-slot:activator="{ props }">
-                      <v-icon v-bind="props" @click="sqlInMode = !sqlInMode" :color="sqlInMode ? 'success' : 'error'" small>
-                        {{ sqlInMode ? 'mdi-database' : 'mdi-database-off'}}
-                      </v-icon>
-                    </template>
-                  </v-tooltip>
-                  <v-tooltip text="Toggle one per line display" location="top">
-                    <template v-slot:activator="{ props }">
-                      <v-icon v-bind="props" @click="inlineMode = !inlineMode" :color="inlineMode ? 'error' : 'success'" small>
-                        mdi-keyboard-return
-                      </v-icon>
-                    </template>
-                  </v-tooltip>
-                </div></template>            
             </v-textarea>
           </v-card-text>
 
-          <v-card-actions>
+          <v-card-actions class="mt-0 pt-0">
             <v-row>
               <v-col cols="2">
                 <v-btn color="primary" variant="tonal" @click="sendOutputToInput"
-                  :disabled="!text.destination || text.origin === text.destination" :loading="submittingText" icon="mdi-chevron-left">
+                  :disabled="!text.destination.length" :loading="submittingText" icon="mdi-chevron-left">
                   <v-tooltip activator="parent" location="top">
                     Send Output to Input
                   </v-tooltip>
@@ -175,7 +191,7 @@
               </v-col>
               <v-col cols="10" class="align-self-center">
                 <v-btn color="success" variant="tonal" @click="copyToClipboard(formattedTextDestination)" block
-                  :disabled="!text.destination" :loading="submittingText">
+                  :disabled="!text.destination.length" :loading="submittingText">
                   <v-tooltip activator="parent" location="top">
                     Copy to clipboard
                   </v-tooltip>
@@ -192,15 +208,15 @@
 
 <script>
 import { mapGetters, mapActions } from 'vuex';
+import { preferences } from '@/plugins/preferences';
+import _ from 'lodash';
 
 export default {
   components: {
   },
   data() {
     return {
-      snackbar: false, // To display the snackbar
-      snackbarMessage: '', // Snackbar's message
-      snackbarType: 'success', // Default color for snackbar ('success' or 'error')
+      loading: true,
       text: {
         origin: '',
         destination: [],
@@ -208,23 +224,111 @@ export default {
       submittingText: false,
       sqlInMode: false,
       inlineMode: true,
+      savingPreferences: false,
+      selectedFormatters: [],
+      selectedSeparators: [],   // e.g. ['comma','newline']
+      separators: [
+        { key: 'comma',     pattern: ',',           label: ',',     icon: 'mdi-comma',            tooltip: 'abc, def, ghi' },
+        { key: 'newline',   pattern: '\\n',         label: '↵',     icon: 'mdi-keyboard-return',  tooltip: 'abc<br/>def<br/>ghi' },
+        { key: 'space',     pattern: '\\s+',        label: 'space', icon: 'mdi-keyboard-space',   tooltip: 'abc def ghi' },
+        { key: 'semicolon', pattern: ';',           label: ';',     icon: null,                   tooltip: 'abc ; def ; ghi' },
+        { key: 'pipe',      pattern: '\\|',         label: '|',     icon: null,                   tooltip: 'abc | def | ghi' },
+        { key: 'slash',     pattern: '\\/',         label: '/',     icon: 'mdi-slash-forward',    tooltip: 'abc / def / ghi' },
+        { key: 'dash',      pattern: '-',           label: '-',     icon: null,                   tooltip: 'abc - def - ghi' },
+        { key: 'tab',       pattern: '\\t',         label: '↹',     icon: 'mdi-keyboard-tab',     tooltip: 'abc&nbsp;&nbsp;&nbsp;&nbsp;def&nbsp;&nbsp;&nbsp;&nbsp;ghi' },
+        { key: 'et',        pattern: '\\s+et\\s+',  label: 'et',    icon: null,                   tooltip: 'abc et def' },
+        { key: 'and',       pattern: '\\s+and\\s+', label: 'and',   icon: null,                   tooltip: 'abc and def' },
+        { key: 'amp',       pattern: '\\s*&\\s*',   label: '&',     icon: 'mdi-ampersand',        tooltip: 'abc & def' }
+      ],
+      formatters: [
+        { key: 'comma',   label: ',',     icon: 'mdi-comma',                                  tooltip: 'elt1, elt2, elt3' },
+        { key: 'newline', label: '↵',     icon: 'mdi-keyboard-return',                        tooltip: 'elt1<br/>elt2<br/>elt3' },
+        { key: 'space',   label: 'space', icon: 'mdi-keyboard-space',                         tooltip: 'elt1 elt2 elt3' },
+        { key: 'sqlIn',   label: 'IN ()', icon: 'mdi-database', iconOff: 'mdi-database-off',  tooltip: 'IN (elt1, elt2, elt3)' },
+        { key: 'quoted',  label: "' '",   icon: 'mdi-format-quote-close',                     tooltip: "'elt1', 'elt2', 'elt3'" }
+      ],
     };
   },
   computed: {
     ...mapGetters(['getServerURL', 'getUser']),
     formattedTextDestination() {
       if (!this.text.destination) return "";
-      const mode = this.inlineMode ? ', ' : (this.sqlInMode ? ',\n': '\n');
       let data;
       if (typeof this.text.destination === "string")
         data = this.text.destination;
-      else
-        data = this.text.destination.join(mode);
-      return this.sqlInMode ? 'IN (' + data + ')' : data;
+      else {
+        const items = this.text.destination.map(elt => {
+          if (this.selectedFormatters.includes('quoted')) {
+            // Wrap in single quotes, escaping existing single quotes
+            const cleanElt = elt.replace(/'/g, "''");
+            return `'${cleanElt}'`;
+          }
+          return elt;
+        });
+        data = items.join(this.joinMode);
+      }
+      return this.selectedFormatters.includes('sqlIn') ? 'IN (' + data + ')' : data;
+    },
+    joinMode() {
+      let join = '';
+      if (this.selectedFormatters.includes('comma')) join += ',';
+      if (this.selectedFormatters.includes('space')) join += ' ';
+      if (this.selectedFormatters.includes('newline')) join += '\n';
+      return join || ',';  // default to comma if none selected
     },
   },
   methods: {
-    ...mapActions(['setUser']),
+    ...mapActions(['setUser', 'triggerSnackbar']),
+
+    parseElements(text) {
+      if (!text || typeof text !== 'string') return [];
+
+      const trimmed = text.trim().replace(/\u00A0/g, ' '); // trim and replace non-breaking spaces
+
+      // Build the split regex from selectedSeparators
+      let splitRegex;
+      if (this.selectedSeparators && this.selectedSeparators.length > 0) {
+        // map selected keys to patterns from separators array
+        const parts = this.selectedSeparators
+          .map(k => {
+            const s = this._sepMap[k];
+            console.log('Separator key:', k, 'Pattern:', s);
+            return s ? s : null;
+          })
+          .filter(Boolean)
+          // keep general whitespace pattern last so more specific tokens match first
+          .sort((a, b) => (a === '\\s+' ? 1 : 0) - (b === '\\s+' ? 1 : 0));
+
+        const alternation = parts.join('|');
+        splitRegex = new RegExp('(?:' + alternation + ')+', 'i');
+      } else {
+        // fallback auto-detection (original behavior)
+        splitRegex = /[\s\n\t,;|/-]+/;
+      }
+
+      // Split, trim, filter out empties
+      const raw = trimmed.split(splitRegex)
+        .map(s => s.trim())
+        .filter(s => s.length > 0);
+
+      // Remove surrounding quotes from each element (if present)
+      return raw.map(el => {
+        if ((el.startsWith("'") && el.endsWith("'")) || (el.startsWith('"') && el.endsWith('"'))) {
+          return el.slice(1, -1).trim();
+        }
+        return el;
+      });
+    },
+
+    toggleSqlInMode() {
+      this.sqlInMode = !this.sqlInMode;
+      this.saveUserPreferences();
+    },
+
+    toggleInlineMode() {
+      this.inlineMode = !this.inlineMode;
+      this.saveUserPreferences();
+    },
 
     async fetchCurrentUser() {
       try {
@@ -240,22 +344,56 @@ export default {
       }
     },
 
+    saveUserPreferences: _.debounce(async function() {
+      // Update just the memos section in user's preferences
+      try {
+        this.savingPreferences = true;
+        const response = await preferences.updateSection(this.getServerURL, 'tools', {
+          inlineMode: this.inlineMode,
+          sqlInMode: this.sqlInMode,
+          separators: this.selectedSeparators,
+          formatters: this.selectedFormatters,
+        });
+        if (response.ok) {
+          this.triggerSnackbar("Preferences saved!");
+        }
+      } catch (error) {
+        this.triggerSnackbar({ message: "Error: " + error, type: 'error' });
+      } finally {
+        this.savingPreferences = false;
+      }
+    }, 500),
+
+    async initUserPreferences() {
+      // Init the memos section in user's preferences
+      try {
+        this.savingPreferences = true;
+        // console.log("InitPreferences: ", this.inlineMode, this.sqlInMode);
+        await preferences.updateSection(this.getServerURL, 'tools', {
+          inlineMode: this.inlineMode,
+          sqlInMode: this.sqlInMode,
+          separators: this.selectedSeparators,
+          formatters: this.selectedFormatters,
+        });
+      } catch (error) {
+        console.log(error);
+        this.triggerSnackbar({ message: "Error: " + error + ' while initializing preferences', type: 'error' });
+      } finally {
+        this.savingPreferences = false;
+      }
+    },
+
     copyToClipboard(content) {
       if (navigator.clipboard && window.isSecureContext) {
         // Utiliser l'API clipboard si disponible
         navigator.clipboard.writeText(content)
           .then(() => {
-            this.snackbarMessage = "Memo copied to clipboard!";
-            this.snackbarType = 'success';
+            this.triggerSnackbar("Memo copied to clipboard!");
           })
           .catch(err => {
             console.error("Error while copying memo to clipboard: ", err);
-            this.snackbarMessage = "Memo couldn't be copied.";
-            this.snackbarType = 'error';
+            this.triggerSnackbar({message:"Memo couldn't be copied.", type: 'error'});
           })
-          .finally(() => {
-            this.snackbar = true;
-          });
       } else {
         // Fallback pour les navigateurs qui ne supportent pas l'API
         const textArea = document.createElement("textarea");
@@ -268,15 +406,12 @@ export default {
         textArea.select();
         try {
           document.execCommand('copy');
-          this.snackbarMessage = "Memo copied to clipboard!";
-          this.snackbarType = 'success';
+          this.triggerSnackbar("Memo copied to clipboard!");
         } catch (err) {
           console.error("Error while copying memo to clipboard: ", err);
-          this.snackbarMessage = "Memo couldn't be copied.";
-          this.snackbarType = 'error';
+          this.triggerSnackbar({ message: "Memo couldn't be copied.", type: 'error' });
         } finally {
           document.body.removeChild(textArea);
-          this.snackbar = true;
         }
       }
     },
@@ -293,32 +428,24 @@ export default {
         navigator.clipboard.readText()
           .then((txt) => {
             this.setNestedProperty(this, propertyPath, txt);
-            this.snackbarMessage = "Text pasted from clipboard!";
-            this.snackbarType = 'success';
+            this.triggerSnackbar("Text pasted from clipboard!");
           })
           .catch(err => {
             if (err.name === 'NotAllowedError') {
-              this.snackbarMessage = "Clipboard permission denied. Please allow access.";
-              this.snackbarType = 'error';
+              this.triggerSnackbar({ message: "Clipboard permission denied. Please allow access.", type: 'error' });
             } else {
               console.error("Error while pasting text from clipboard: ", err);
-              this.snackbarMessage = "Clipboard not supported in this browser.";
-              this.snackbarType = 'error';
+              this.triggerSnackbar({ message: "Clipboard not supported in this browser.", type: 'error'});
             }
           })
-          .finally(() => {
-            this.snackbar = true;
-          });
       } else {
         // No fallback - just show informative message
-        this.snackbarMessage = "Clipboard paste not supported in this browser. Use Ctrl+V.";
-        this.snackbarType = 'error';
-        this.snackbar = true;
+        this.triggerSnackbar({message: "Clipboard paste not supported in this browser. Use Ctrl+V.", type:'error'});
       }
     },
 
     sendOutputToInput() {
-      this.text.origin = typeof this.text.destination === "object" ? this.text.destination.join() : this.text.destination;
+      this.text.origin = typeof this.text.destination === "object" ? this.text.destination.join(this.joinMode) : this.text.destination;
     },
 
     formatDate(dateString) {
@@ -348,13 +475,15 @@ export default {
       });
     },
     
-    reformatListOfNumbers() {
+    callFormatList(type='text') {
       this.submittingText = true;
-      const result = this.formatListOfNumbers(this.text.origin);
+      let result;
+      if (type == 'number')
+        result = this.formatListOfNumbers(this.text.origin);
+      else
+        result = this.formatListOfStrings(this.text.origin);
 
-      this.snackbarMessage = result.message;
-      this.snackbarType = result.type;
-      this.snackbar = true;
+      this.triggerSnackbar({ message: result.message, type: result.type });
 
       if (result.type == 'success')
         this.text.destination = result.data;
@@ -363,27 +492,9 @@ export default {
     },
     
     formatListOfNumbers(text) {
-      if (!text || typeof text !== 'string') {
-        return {message: "Input must be a non-empty string", type: 'error'};
-      }
-
-      // Remove quotes and normalize common separators to commas
-      let processedText = text.replace(/["']/g, '')
-                            .replace(/\s*et\s*|\s*&\s*/gi, ', ')
-                            .trim();
-
-      if (!processedText) {
-        return {message: "No valid content found after processing", type: 'error'};
-      }
-
-      // Split by multiple separators: space, newline, tab, comma, semicolon, pipe, dash, slash
-      const separators = /[\s\n\t,;|/]+/;
-      const elements = processedText.split(separators)
-                                  .map(item => item.trim())
-                                  .filter(item => item.length > 0);
-
+      const elements = this.parseElements(text);
       if (elements.length === 0) {
-        return {message: "No elements found after processing", type: 'error'};
+        return {message: "No valid elements found after processing", type: 'error'};
       }
 
       const reformattedNumbers = [];
@@ -406,50 +517,9 @@ export default {
 
       return {message: "Data reformatted successfully", type: 'success', data: reformattedNumbers};
     },
-
-    reformatListOfStrings() {
-      this.submittingText = true;
-      const result = this.formatListOfStrings(this.text.origin);
-
-      this.snackbarMessage = result.message;
-      this.snackbarType = result.type;
-      this.snackbar = true;
-
-      if (result.type == 'success') {
-        this.text.destination = result.data;
-      }
-      this.submittingText = false;
-    },
-    
+ 
     formatListOfStrings(text){
-      if (!text || typeof text !== 'string') {
-        return {message: "Input must be a non-empty string", type: 'error'};
-      }
-
-      let processedText = text.replace(/;/g, ',')
-        .replace(/\s*et\s*|\s*&\s*/gi, ',')
-        .trim();
-
-      if (!processedText) {
-        return {message: "No valid content found after processing", type: 'error'};
-      }
-
-      let elements;
-
-      // Detect separation method: comma or newline
-      if (processedText.includes(',') || processedText.includes('\n')) {
-        elements = processedText.replace(/\n/g, ',')
-          .split(',')
-          .map(item => item.trim());
-      } else {
-        // Split by multiple spaces
-        elements = processedText.split(/\s+/)
-          .map(item => item.trim());
-      }
-
-      // Filter empty elements
-      elements = elements.filter(item => item.length > 0);
-
+      const elements = this.parseElements(text);
       if (elements.length === 0) {
         return {message: "No valid elements found after processing", type: 'error'};
       }
@@ -472,77 +542,15 @@ export default {
       return {message: "Data reformatted successfully", type: 'success', data: reformattedElements};
     },
 
-    reformatListOfQuotedStrings() {
+    reformatCase(upper=true) {
       this.submittingText = true;
-      const result = this.formatListOfQuotedStrings(this.text.origin);
+      let result = '';
+      if (upper)
+        result = this.formatAsUpperCase(this.text.origin);
+      else
+        result = this.formatAsLowerCase(this.text.origin);
 
-      this.snackbarMessage = result.message;
-      this.snackbarType = result.type;
-      this.snackbar = true;
-
-      if (result.type == 'success')
-        this.text.destination = result.data;
-
-      this.submittingText = false;
-    },
-
-    formatListOfQuotedStrings(text) {
-      if (!text || typeof text !== 'string') {
-        return {message: "Input must be a non-empty string", type: 'error'};
-      }
-
-      let processedText = text.replace(/;/g, ',')
-        .replace(/\s*et\s*|\s*&\s*/gi, ',')
-        .trim();
-
-      if (!processedText) {
-        return {message: "No valid content found after processing", type: 'error'};
-      }
-
-      let elements;
-
-      // Detect separation method: comma or newline
-      if (processedText.includes(',') || processedText.includes('\n')) {
-        elements = processedText.replace(/\n/g, ',')
-          .split(',')
-          .map(item => item.trim());
-      } else {
-        // Split by multiple spaces
-        elements = processedText.split(/\s+/)
-          .map(item => item.trim());
-      }
-
-      // Filter empty elements
-      elements = elements.filter(item => item.length > 0);
-
-      if (elements.length === 0) {
-        return {message: "No valid elements found after processing", type: 'error'};
-      }
-
-      const reformattedElements = elements.map(element => {
-        // Remove existing double quotes and trim
-        const cleanElement = element.replace(/"/g, "'").trim();
-
-        // If already properly quoted with single quotes, leave as is
-        if (cleanElement.startsWith("'") && cleanElement.endsWith("'")) {
-          return cleanElement;
-        }
-
-        // Otherwise wrap in single quotes, handling existing mismatched quotes
-        const unquotedElement = cleanElement.replace(/(^')|('$)/g, '');
-        return `'${unquotedElement}'`;
-      });
-
-      return {message: "Data reformatted successfully", type: 'success', data: reformattedElements};
-    },
-
-    reformatAsUpperCase() {
-      this.submittingText = true;
-      const result = this.formatAsUpperCase(this.text.origin);
-
-      this.snackbarMessage = result.message;
-      this.snackbarType = result.type;
-      this.snackbar = true;
+      this.triggerSnackbar({ message: result.message, type: result.type });
 
       if (result.type == 'success')
         this.text.destination = [result.data];
@@ -552,20 +560,6 @@ export default {
 
     formatAsUpperCase(text) {
       return { message: "Data reformatted successfully", type: "success", data: text.toUpperCase() };
-    },
-
-    reformatAsLowerCase() {
-      this.submittingText = true;
-      const result = this.formatAsLowerCase(this.text.origin);
-
-      this.snackbarMessage = result.message;
-      this.snackbarType = result.type;
-      this.snackbar = true;
-
-      if (result.type == 'success')
-        this.text.destination = result.data;
-
-      this.submittingText = false;
     },
 
     formatAsLowerCase(text) {
@@ -590,9 +584,7 @@ export default {
           break;
       }
 
-      this.snackbarMessage = result.message;
-      this.snackbarType = result.type;
-      this.snackbar = true;
+      this.triggerSnackbar({ message: result.message, type: result.type });
 
       if (result.type == 'success') {
         this.text.destination = result.data;
@@ -604,13 +596,10 @@ export default {
     },
     
     checkNoDuplicates(text) {
-      if (!text || typeof text !== 'string') {
-        return {message: "Input must be a non-empty string", type: "error"};
+      const elements = this.parseElements(text);
+      if (elements.length === 0) {
+        return {message: "No valid elements found after processing", type: "error"};
       }
-
-      const result = this.formatListOfStrings(text);
-      if (result.type !== 'success') return result;
-      const elements = result.data;
 
       // Find elements that appear only once, preserving original order
       const elementCount = {};
@@ -628,17 +617,7 @@ export default {
     },
 
     checkDuplicates(text) {
-      if (!text || typeof text !== 'string') {
-        return {message: "Input must be a non-empty string", type: "error"};
-      }
-
-      // Remove quotes and split by separators
-      const processedText = text.replace(/["']/g, '');
-      const separators = /[\s\n\t,;|-]+/;
-      const elements = processedText.split(separators)
-                                  .map(item => item.trim())
-                                  .filter(item => item.length > 0);
-
+      const elements = this.parseElements(text);
       if (elements.length === 0) {
         return {message: "No valid elements found after processing", type: "error"};
       }
@@ -672,17 +651,7 @@ export default {
     },
 
     cleanDuplicates(text) {
-      if (!text || typeof text !== 'string') {
-        return {message: "Input must be a non-empty string", type: "error"};
-      }
-
-      // Remove quotes and split by separators
-      const processedText = text.replace(/["']/g, '');
-      const separators = /[\s\n\t,;|-]+/;
-      const elements = processedText.split(separators)
-                                  .map(item => item.trim())
-                                  .filter(item => item.length > 0);
-
+      const elements = this.parseElements(text);
       if (elements.length === 0) {
         return {message: "No valid elements found after processing", type: "error"};
       }
@@ -708,15 +677,10 @@ export default {
     },
 
     cleanDuplicatesByLine(text) {
-      if (!text || typeof text !== 'string') {
-        return {message: "Input must be a non-empty string", type: "error"};
-      }
+      const tmpSeparators = this.selectedSeparators;
+      this.selectedSeparators = ['newline'];
 
-      // Split text into lines and strip whitespace
-      const elements = text.split('\n')
-                          .map(line => line.trim())
-                          .filter(line => line.length > 0);
-
+      const elements = this.parseElements(text);
       if (elements.length === 0) {
         return {message: "No valid lines found after processing", type: "error"};
       }
@@ -733,7 +697,9 @@ export default {
       });
 
       const duplicatesRemoved = elements.length - uniqueElements.length;
-      
+
+      this.selectedSeparators = tmpSeparators;
+
       return {
         message: `Removed ${duplicatesRemoved} duplicate lines.`,
         type: "success",
@@ -744,6 +710,21 @@ export default {
 
   async mounted() {
     await this.fetchCurrentUser();
+    // Load just the tools preferences
+    const toolsPrefs = await preferences.getSection(this.getServerURL, 'tools');
+    if (!_.isEmpty(toolsPrefs)) {
+      this.inlineMode = toolsPrefs.inlineMode && true;  // true by default
+      this.sqlInMode = toolsPrefs.sqlInMode || false;
+      this.selectedSeparators = Array.isArray(toolsPrefs.separators) ? toolsPrefs.separators : [];
+      this.selectedFormatters = Array.isArray(toolsPrefs.formatters) ? toolsPrefs.formatters : [];
+    } else {
+      this.initUserPreferences();
+    }
+    // to improve performance, create a map of separator patterns
+    this._sepMap = this.separators.reduce((m, s) => { m[s.key] = s.pattern; return m; }, {});
+    console.log(this._sepMap);
+
+    this.loading = false;
   },
 
   beforeUnmount() {

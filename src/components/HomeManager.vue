@@ -1,22 +1,5 @@
 <template>
   <v-container fluid height="100%">
-    <v-snackbar v-model="snackbar" 
-      :timeout="snackbarType === 'success' ? 2000 : 5000" 
-      :color="snackbarType" 
-      location="top"
-    >
-      <template v-slot:actions>
-        <v-btn
-          color="white"
-          text
-          @click="snackbar = false"
-        >
-          <v-icon>mdi-close</v-icon>
-        </v-btn>
-      </template>
-      {{ snackbarMessage }}
-    </v-snackbar>
-
     <v-row class="mx-auto" style="margin:0 auto; max-width:1000px; position:relative;top:50%;transform: translateY(-50%)">
       <v-col v-for="section, key in sections" :key="key" 
         cols="12" 
@@ -47,9 +30,6 @@ export default {
   },
   data() {
     return {
-      snackbar: false, // To display the snackbar
-      snackbarMessage: '', // Snackbar's message
-      snackbarType: 'success', // Default color for snackbar ('success' or 'error')
       sections: {
         memos: {
           title: "Memos",
