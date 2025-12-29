@@ -222,8 +222,6 @@ export default {
         destination: [],
       },
       submittingText: false,
-      sqlInMode: false,
-      inlineMode: true,
       savingPreferences: false,
       selectedFormatters: [],
       selectedSeparators: [],   // e.g. ['comma','newline']
@@ -245,7 +243,8 @@ export default {
         { key: 'newline', label: '↵',     icon: 'mdi-keyboard-return',                        tooltip: 'elt1<br/>elt2<br/>elt3' },
         { key: 'space',   label: 'space', icon: 'mdi-keyboard-space',                         tooltip: 'elt1 elt2 elt3' },
         { key: 'sqlIn',   label: 'IN ()', icon: 'mdi-database', iconOff: 'mdi-database-off',  tooltip: 'IN (elt1, elt2, elt3)' },
-        { key: 'quoted',  label: "' '",   icon: 'mdi-format-quote-close',                     tooltip: "'elt1', 'elt2', 'elt3'" }
+        { key: 'quoted',  label: "' '",   icon: 'mdi-format-quote-close',                     tooltip: "'elt1', 'elt2', 'elt3'" },
+        { key: 'pipe',    label: '|',     icon: null,                                         tooltip: 'abc|def|ghi (useful for RegExp)' },
       ],
     };
   },
@@ -273,6 +272,7 @@ export default {
       let join = '';
       if (this.selectedFormatters.includes('comma')) join += ',';
       if (this.selectedFormatters.includes('space')) join += ' ';
+      if (this.selectedFormatters.includes('pipe')) join += '|';
       if (this.selectedFormatters.includes('newline')) join += '\n';
       return join || ',';  // default to comma if none selected
     },
@@ -292,7 +292,6 @@ export default {
         const parts = this.selectedSeparators
           .map(k => {
             const s = this._sepMap[k];
-            console.log('Separator key:', k, 'Pattern:', s);
             return s ? s : null;
           })
           .filter(Boolean)
@@ -320,16 +319,6 @@ export default {
       });
     },
 
-    toggleSqlInMode() {
-      this.sqlInMode = !this.sqlInMode;
-      this.saveUserPreferences();
-    },
-
-    toggleInlineMode() {
-      this.inlineMode = !this.inlineMode;
-      this.saveUserPreferences();
-    },
-
     async fetchCurrentUser() {
       try {
         const response = await fetch(this.getServerURL + '/users/me', {
@@ -349,8 +338,6 @@ export default {
       try {
         this.savingPreferences = true;
         const response = await preferences.updateSection(this.getServerURL, 'tools', {
-          inlineMode: this.inlineMode,
-          sqlInMode: this.sqlInMode,
           separators: this.selectedSeparators,
           formatters: this.selectedFormatters,
         });
@@ -368,10 +355,7 @@ export default {
       // Init the memos section in user's preferences
       try {
         this.savingPreferences = true;
-        // console.log("InitPreferences: ", this.inlineMode, this.sqlInMode);
         await preferences.updateSection(this.getServerURL, 'tools', {
-          inlineMode: this.inlineMode,
-          sqlInMode: this.sqlInMode,
           separators: this.selectedSeparators,
           formatters: this.selectedFormatters,
         });
@@ -713,8 +697,6 @@ export default {
     // Load just the tools preferences
     const toolsPrefs = await preferences.getSection(this.getServerURL, 'tools');
     if (!_.isEmpty(toolsPrefs)) {
-      this.inlineMode = toolsPrefs.inlineMode && true;  // true by default
-      this.sqlInMode = toolsPrefs.sqlInMode || false;
       this.selectedSeparators = Array.isArray(toolsPrefs.separators) ? toolsPrefs.separators : [];
       this.selectedFormatters = Array.isArray(toolsPrefs.formatters) ? toolsPrefs.formatters : [];
     } else {
@@ -722,7 +704,6 @@ export default {
     }
     // to improve performance, create a map of separator patterns
     this._sepMap = this.separators.reduce((m, s) => { m[s.key] = s.pattern; return m; }, {});
-    console.log(this._sepMap);
 
     this.loading = false;
   },

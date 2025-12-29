@@ -1,5 +1,40 @@
 <template>
   <v-container fluid>
+    <!-- Connections Management Section -->
+    <v-row class="mb-4">
+      <v-col cols="12">
+        <v-card variant="outlined">
+          <v-card-title class="bg-primary">
+            <v-icon class="mr-2">mdi-database-cog</v-icon>
+            Connections Management
+          </v-card-title>
+          <v-card-text class="pa-4">
+            <v-row align="center">
+              <v-col cols="12" md="8">
+                <div class="text-h6 mb-2">Import Connections</div>
+                <div class="text-body-2 text-grey">
+                  Import new connections from the external data source. This will fetch all available connections
+                  and update the database with new entries.
+                </div>
+              </v-col>
+              <v-col cols="12" md="4" class="text-right">
+                <v-btn
+                  color="primary"
+                  size="large"
+                  prepend-icon="mdi-database-import"
+                  @click="importConnections"
+                  :loading="importLoading"
+                >
+                  Import Connections
+                </v-btn>
+              </v-col>
+            </v-row>
+          </v-card-text>
+        </v-card>
+      </v-col>
+    </v-row>
+
+    <!-- Users Management Section -->
     <v-row>
       <v-col cols="12">
         <v-data-table
@@ -145,7 +180,7 @@ export default {
   },
   data() {
     return {
-      
+
       users: [],
       headers: [
         { title: 'ID', value: 'id', align: 'left', width: '80px' },
@@ -161,6 +196,7 @@ export default {
       editDialog: false,
       deleteDialog: false,
       loading: false,
+      importLoading: false,
       editedUser: {},
       originalUser: {},
       statusOptions: [
@@ -176,6 +212,38 @@ export default {
   },
   methods: {
     ...mapActions(['triggerSnackbar']),
+    async importConnections() {
+      this.importLoading = true;
+      try {
+        const response = await fetch(this.getServerURL + '/connections/import', {
+          method: 'POST',
+          credentials: 'include'
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to import connections');
+        }
+
+        const result = await response.json();
+
+        // Build detailed message with all stats
+        const details = [];
+        if (result.imported > 0) details.push(`${result.imported} imported`);
+        if (result.updated > 0) details.push(`${result.updated} updated`);
+        if (result.skipped > 0) details.push(`${result.skipped} skipped`);
+
+        const message = `${result.message || 'Import completed'} - Total: ${result.total || 0} (${details.join(', ')})`;
+
+        this.triggerSnackbar({ message, type: 'success' });
+      } catch (error) {
+        console.error('Error importing connections:', error);
+        this.triggerSnackbar({ message: error.message, type: 'error' });
+      } finally {
+        this.importLoading = false;
+      }
+    },
+
     async fetchUsers() {
       try {
         const response = await fetch(this.getServerURL + '/users', {

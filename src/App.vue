@@ -105,8 +105,8 @@ export default {
         group: "main",
       },
       {
-        name:"Connections",
-        icon:"mdi-database-outline",
+        name:"Web Connections",
+        icon:"mdi-web",
         routeName: "Connections",
         needAuth: true,
         func: null,
@@ -122,7 +122,7 @@ export default {
       },
       {
         name:"String Tools",
-        icon:"mdi-code-braces",
+        icon:"mdi-tools",
         routeName: "StringTools",
         needAuth: true,
         func: null,

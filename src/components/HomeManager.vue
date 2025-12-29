@@ -6,12 +6,15 @@
         md="6" 
         transition="fade-transition">
         <v-card @click="$router.push(section.link)">
-          <v-card-title style="cursor:pointer">{{section.title}}</v-card-title>
+          <v-card-title style="cursor:pointer"><v-icon>{{ section.icon }}</v-icon> {{section.title}}</v-card-title>
           <v-card-subtitle>
             <span v-if="section.count"><strong>{{ section.count }}</strong> {{ key }}
               <span v-if="section.distinct_authors"> - <strong>{{ section.distinct_authors }}</strong> authors</span>
               <span v-if="section.distinct_categories"> - <strong>{{ section.distinct_categories }}</strong> categories</span>
               <span v-if="section.distinct_types"> - <strong>{{ section.distinct_types }}</strong> types</span>
+              <span v-if="section.unique_companies"> - <strong>{{ section.unique_companies }}</strong> companies</span>
+              <span v-if="section.unique_sites"> - <strong>{{ section.unique_sites }}</strong> sites</span>
+              <span v-if="section.unique_applications"> - <strong>{{ section.unique_applications }}</strong> applications</span>
             </span>
             <span v-else><v-progress-circular indeterminate :size="12" :width="1"></v-progress-circular></span>
           </v-card-subtitle>
@@ -38,19 +41,27 @@ export default {
           distinct_authors: 0,
           distinct_categories: 0,
           distinct_types: 0,
+          icon:"mdi-note-multiple-outline",
         },
         connections: {
           title: "Web Connections",
           link: 'connections',
+          icon: "mdi-web",
+          count: 0,
+          unique_companies: 0,
+          unique_sites: 0,
+          unique_applications: 0,
         },
         procedures: {
           title: "Recovery Procedures",
           link: 'procedures',
+          icon:"mdi-file-cog-outline",
         },
         tools: {
           title: "String Tools",
           link: 'string-tools',
-          count: 9,
+          count: 8,
+          icon:"mdi-tools",
         },
       },
     };
@@ -80,7 +91,7 @@ export default {
           credentials: 'include'  // include session cookie
         });
         if (!response.ok) {
-          throw new Error('Failed to retrieve categories.');
+          throw new Error('Failed to retrieve memo stats.');
         }
         const data = await response.json();
         this.sections.memos.count = data.count;
@@ -88,13 +99,31 @@ export default {
         this.sections.memos.distinct_categories = data.categories;
         this.sections.memos.distinct_types = data.types;
       } catch (error) {
-        console.error('Error while retrieving categories:', error);
+        console.error('Error while retrieving memo stats:', error);
+      }
+    },
+    async fetchConnectionStats() {
+      try {
+        const response = await fetch(this.getServerURL + '/connections/stats', {
+          credentials: 'include'  // include session cookie
+        });
+        if (!response.ok) {
+          throw new Error('Failed to retrieve connection stats.');
+        }
+        const data = await response.json();
+        this.sections.connections.count = data.total_connections;
+        this.sections.connections.unique_companies = data.unique_companies;
+        this.sections.connections.unique_sites = data.unique_sites;
+        this.sections.connections.unique_applications = data.unique_applications;
+      } catch (error) {
+        console.error('Error while retrieving connection stats:', error);
       }
     },
   },
   async mounted() {
     await this.fetchCurrentUser();
     await this.fetchMemoStats();
+    await this.fetchConnectionStats();
   },
   beforeUnmount() {
   },
