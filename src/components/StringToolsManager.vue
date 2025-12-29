@@ -257,12 +257,15 @@ export default {
         data = this.text.destination;
       else {
         const items = this.text.destination.map(elt => {
+          // Convert to string first (in case it's a number)
+          const strElt = String(elt);
+
           if (this.selectedFormatters.includes('quoted')) {
             // Wrap in single quotes, escaping existing single quotes
-            const cleanElt = elt.replace(/'/g, "''");
+            const cleanElt = strElt.replace(/'/g, "''");
             return `'${cleanElt}'`;
           }
-          return elt;
+          return strElt;
         });
         data = items.join(this.joinMode);
       }
