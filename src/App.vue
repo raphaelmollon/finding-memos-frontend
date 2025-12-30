@@ -21,7 +21,7 @@
         {{ documentTitle }}
       </v-toolbar-title>
       <v-spacer></v-spacer>
-      <v-text-field v-model="ticketNumber" name="gotoSavoyeline"
+      <v-text-field v-if="showTicketField" v-model="ticketNumber" name="gotoSavoyeline"
         variant="underlined" placeholder="26011234" density="compact"
         hide-details type="text" maxlength="8" max-width="125"
         :color="ticketNumberValid ? 'success' : 'error'"
@@ -96,6 +96,8 @@
 <script>
 import { mapGetters, mapActions } from 'vuex'
 import SnackBar from './components/common/SnackBar.vue';
+import { preferences } from '@/plugins/preferences';
+import _ from 'lodash';
 
 export default {
   name: 'App',
@@ -204,7 +206,7 @@ export default {
   }),
 
   computed: {
-    ...mapGetters(['isAuthenticated', 'isSuperuser', 'getUser', 'getServerURL', 'getSnackbar']),
+    ...mapGetters(['isAuthenticated', 'isSuperuser', 'getUser', 'getServerURL', 'getSnackbar', 'getShowTicketField']),
     snackbar() {
       return this.getSnackbar;
     },
@@ -212,10 +214,24 @@ export default {
       get() { return this.getSnackbar.show; },
       set(v) { if (!v) this.triggerSnackbar(); }
     },
+    showTicketField() {
+      return this.getShowTicketField;
+    },
   },
 
   methods: {
-    ...mapActions(['triggerSnackbar']),
+    ...mapActions(['triggerSnackbar', 'updateShowTicketField']),
+    async loadPreferences() {
+      try {
+        const generalPrefs = await preferences.getSection(this.getServerURL, 'general');
+        if (!_.isEmpty(generalPrefs)) {
+          const value = generalPrefs.showTicketField !== undefined ? generalPrefs.showTicketField : false;
+          this.updateShowTicketField(value);
+        }
+      } catch (error) {
+        console.error('Error loading preferences:', error);
+      }
+    },
     validateTicketNumber(value) {
       // Must be exactly 8 digits
       if (!value || value.length !== 8 || !/^\d{8}$/.test(value)) {
@@ -280,10 +296,12 @@ export default {
     }
   },
 
-  mounted() {
+  async mounted() {
     document.title = this.documentTitle;
     this.isMobile = window.innerWidth < this.mobileThreshold;
     window.addEventListener('resize', this.onResize);
+
+    await this.loadPreferences();
 
     setTimeout(() => {
       this.loading = false;

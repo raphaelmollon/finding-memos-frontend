@@ -10,6 +10,9 @@ const store = createStore({
         },
         serverURL: process.env.VUE_APP_API_URL,
         environment: process.env.VUE_APP_ENV,
+        preferences: {
+            showTicketField: false,
+        },
     },
     getters: {
         isAuthenticated: state => !!state.user,
@@ -18,6 +21,8 @@ const store = createStore({
         getServerURL: state => state.serverURL,
         isDevelopment: (state) => state.environment === 'development',
         getSnackbar: (state) => state.snackbar,
+        getPreferences: (state) => state.preferences,
+        getShowTicketField: (state) => state.preferences.showTicketField,
     },
     mutations: {
         setUser(state, user) {
@@ -33,6 +38,9 @@ const store = createStore({
             state.snackbar.show = false;
             state.snackbar.message = '';
         },
+        setShowTicketField(state, value) {
+            state.preferences.showTicketField = value;
+        },
     },
     actions: {
         setUser({ commit }, user) {
@@ -40,6 +48,9 @@ const store = createStore({
         },
         clearUser({ commit }) {
             commit('clearUser');
+        },
+        updateShowTicketField({ commit }, value) {
+            commit('setShowTicketField', value);
         },
         async validateSession({ commit, getters }) {
             try {

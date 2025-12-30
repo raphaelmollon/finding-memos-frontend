@@ -19,6 +19,32 @@
       </v-col>
     </v-row>
 
+    <!-- Preferences Section -->
+    <v-row justify="center" class="mt-4">
+      <v-col cols="6">
+        <v-card class="mx-auto" title="Preferences">
+          <v-card-text>
+            <v-row align="center">
+              <v-col cols="8">
+                <div class="text-subtitle-1">Show Savoyeline Ticket Shortcut</div>
+                <div class="text-caption text-grey">Display the quick access field in the toolbar to open Savoyeline tickets</div>
+              </v-col>
+              <v-col cols="4" class="text-right">
+                <v-switch
+                  v-model="showTicketField"
+                  color="primary"
+                  hide-details
+                  inset
+                  :loading="savingPreferences"
+                  @change="savePreferences"
+                ></v-switch>
+              </v-col>
+            </v-row>
+          </v-card-text>
+        </v-card>
+      </v-col>
+    </v-row>
+
     <!-- Edit Profile Dialog -->
     <edit-profile-dialog
       ref="editDialog"
@@ -31,6 +57,8 @@
 <script>
 import { mapGetters, mapActions } from 'vuex';
 import EditProfileDialog from './profile/EditProfileDialog.vue';
+import { preferences } from '@/plugins/preferences';
+import _ from 'lodash';
 
 export default {
   components: {
@@ -41,13 +69,42 @@ export default {
       dialog: false,
       editedProp: {},
       user: {},
+      showTicketField: false,
+      savingPreferences: false,
     };
   },
   computed: {
     ...mapGetters(['getServerURL'])
   },
   methods: {
-    ...mapActions(['triggerSnackbar']),
+    ...mapActions(['triggerSnackbar', 'updateShowTicketField']),
+    savePreferences: _.debounce(async function() {
+      try {
+        this.savingPreferences = true;
+        const response = await preferences.updateSection(this.getServerURL, 'general', {
+          showTicketField: this.showTicketField,
+        });
+        if (response.ok) {
+          // Update Vuex store to immediately reflect in App toolbar
+          this.updateShowTicketField(this.showTicketField);
+          this.triggerSnackbar("Preferences saved!");
+        }
+      } catch (error) {
+        this.triggerSnackbar({ message: "Error: " + error, type: 'error' });
+      } finally {
+        this.savingPreferences = false;
+      }
+    }, 500),
+    async loadPreferences() {
+      try {
+        const generalPrefs = await preferences.getSection(this.getServerURL, 'general');
+        if (!_.isEmpty(generalPrefs)) {
+          this.showTicketField = generalPrefs.showTicketField !== undefined ? generalPrefs.showTicketField : false;
+        }
+      } catch (error) {
+        console.error('Error loading preferences:', error);
+      }
+    },
     getUserAvatarUrl(filename) {
       // console.log(`${this.getServerURL}/static/avatars/${filename || '0.png'}`)
       return `${this.getServerURL}/static/avatars/${filename || '0.png'}`
@@ -90,8 +147,9 @@ export default {
       }
     },
   },
-  mounted() {
-    this.fetchProfile();
+  async mounted() {
+    await this.fetchProfile();
+    await this.loadPreferences();
   },
 };
 </script>
