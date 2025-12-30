@@ -22,7 +22,7 @@
       </v-toolbar-title>
       <v-spacer></v-spacer>
       <v-text-field v-if="showTicketField" v-model="ticketNumber" name="gotoSavoyeline"
-        variant="underlined" placeholder="26011234" density="compact"
+        variant="underlined" :placeholder="ticketPlaceholder" density="compact"
         hide-details type="text" maxlength="8" max-width="125"
         :color="ticketNumberValid ? 'success' : 'error'"
         @input="handleTicketInput"
@@ -96,8 +96,6 @@
 <script>
 import { mapGetters, mapActions } from 'vuex'
 import SnackBar from './components/common/SnackBar.vue';
-import { preferences } from '@/plugins/preferences';
-import _ from 'lodash';
 
 export default {
   name: 'App',
@@ -217,21 +215,16 @@ export default {
     showTicketField() {
       return this.getShowTicketField;
     },
+    ticketPlaceholder() {
+      const now = new Date();
+      const year = String(now.getFullYear()).slice(-2).padStart(2, '0');
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      return `${year}${month}1234`;
+    },
   },
 
   methods: {
     ...mapActions(['triggerSnackbar', 'updateShowTicketField']),
-    async loadPreferences() {
-      try {
-        const generalPrefs = await preferences.getSection(this.getServerURL, 'general');
-        if (!_.isEmpty(generalPrefs)) {
-          const value = generalPrefs.showTicketField !== undefined ? generalPrefs.showTicketField : false;
-          this.updateShowTicketField(value);
-        }
-      } catch (error) {
-        console.error('Error loading preferences:', error);
-      }
-    },
     validateTicketNumber(value) {
       // Must be exactly 8 digits
       if (!value || value.length !== 8 || !/^\d{8}$/.test(value)) {
@@ -300,8 +293,6 @@ export default {
     document.title = this.documentTitle;
     this.isMobile = window.innerWidth < this.mobileThreshold;
     window.addEventListener('resize', this.onResize);
-
-    await this.loadPreferences();
 
     setTimeout(() => {
       this.loading = false;

@@ -52,7 +52,7 @@ const store = createStore({
         updateShowTicketField({ commit }, value) {
             commit('setShowTicketField', value);
         },
-        async validateSession({ commit, getters }) {
+        async validateSession({ commit, getters, dispatch }) {
             try {
                 const response = await fetch(getters.getServerURL + '/auth/session-check', {
                     method: 'GET',
@@ -62,6 +62,8 @@ const store = createStore({
                 if (response.ok) {
                     const { user } = await response.json();
                     commit('setUser', user);
+                    // Load preferences after successful authentication
+                    await dispatch('loadPreferences');
                 } else if (response.headers.get('X-Session-Timeout') === 'true') {
                     commit('showSnackbar', { message: 'Woops! Where have you been? You need to sign in again.', type: 'error' });
                     commit('clearUser');
@@ -126,6 +128,24 @@ const store = createStore({
             })
 
             return result
+        },
+
+        async loadPreferences({ commit, getters }) {
+            try {
+                // Import lodash for isEmpty check
+                const lodashModule = await import('lodash');
+                const _ = lodashModule.default || lodashModule;
+                // Import preferences plugin
+                const { preferences } = await import('@/plugins/preferences');
+
+                const generalPrefs = await preferences.getSection(getters.getServerURL, 'general');
+                if (!_.isEmpty(generalPrefs)) {
+                    const value = generalPrefs.showTicketField !== undefined ? generalPrefs.showTicketField : false;
+                    commit('setShowTicketField', value);
+                }
+            } catch (error) {
+                console.error('Error loading preferences:', error);
+            }
         }
     }
 });
