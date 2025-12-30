@@ -18,10 +18,25 @@
         </v-btn>
       </template>
       <v-toolbar-title style="cursor: pointer" @click="$router.push('/')">
-        <!-- <v-img class="mx-2" src="favicon_128.png" max-height="40" max-width="40" contain></v-img> -->
         {{ documentTitle }}
       </v-toolbar-title>
       <v-spacer></v-spacer>
+      <v-text-field v-model="ticketNumber" name="gotoSavoyeline"
+        variant="underlined" placeholder="26011234" density="compact"
+        hide-details type="text" maxlength="8" max-width="125"
+        :color="ticketNumberValid ? 'success' : 'error'"
+        @input="handleTicketInput"
+        @keyup.enter="ticketNumberValid && openSavoyelineTicket()"
+      >
+        <template v-slot:prepend-inner>
+          <img src="/savoyeline.svg" height="20" width="20" class="savoyeline-logo" alt="Savoyeline"
+            :style="{ cursor: ticketNumberValid ? 'pointer' : 'default' }"
+            @click="ticketNumberValid && openSavoyelineTicket()" />
+        </template>
+        <template v-slot:append-inner>
+          <img src="/downasaur.svg" height="20" width="20" class="savoyeline-logo" alt="Downasaur"/>
+        </template>
+      </v-text-field>
       <v-toolbar-items v-if="!loading">
         <template v-for="item in menu" :key="item.name">
           <v-btn v-if="(isAuthenticated && item.needAuth
@@ -184,6 +199,8 @@ export default {
         group: "account",
       },
     ],
+    ticketNumber: '',
+    ticketNumberValid: false,
   }),
 
   computed: {
@@ -199,6 +216,48 @@ export default {
 
   methods: {
     ...mapActions(['triggerSnackbar']),
+    validateTicketNumber(value) {
+      // Must be exactly 8 digits
+      if (!value || value.length !== 8 || !/^\d{8}$/.test(value)) {
+        return false;
+      }
+
+      const year = parseInt(value.substring(0, 2));
+      const month = parseInt(value.substring(2, 4));
+      const currentYear = new Date().getFullYear() % 100; // Get last 2 digits of current year
+
+      // Year must be between 10 and current year
+      if (year < 10 || year > currentYear) {
+        return false;
+      }
+
+      // Month must be between 01 and 12
+      if (month < 1 || month > 12) {
+        return false;
+      }
+
+      return true;
+    },
+    handleTicketInput() {
+      // Only keep digits
+      this.ticketNumber = this.ticketNumber.replace(/\D/g, '');
+
+      // Validate
+      this.ticketNumberValid = this.validateTicketNumber(this.ticketNumber);
+
+      // If valid and 8 digits, open URL automatically
+      if (this.ticketNumberValid && this.ticketNumber.length === 8) {
+        this.openSavoyelineTicket();
+      }
+    },
+    openSavoyelineTicket() {
+      if (!this.ticketNumberValid) return;
+
+      const url = `https://internal.savoyeline.com/modules.php?op=modload&name=Hotline&file=incident_fullscreen&num_incident=${this.ticketNumber}`;
+      window.open(url, '_blank');
+      // this.ticketNumber = '';
+      // this.ticketNumberValid = false;
+    },
     async signOut() {
       const response = await fetch(this.getServerURL+'/auth/sign-out', {
         method: 'POST',
@@ -236,3 +295,14 @@ export default {
   },
 }
 </script>
+
+<style scoped>
+.savoyeline-logo {
+  opacity: 0.9;
+  transition: opacity 0.2s;
+}
+
+.savoyeline-logo:hover {
+  opacity: 1;
+}
+</style>
