@@ -35,7 +35,7 @@
     </v-row>
 
     <!-- Connections Management Section -->
-    <v-row class="mb-4">
+    <v-row v-if="showConnectionsSection" class="mb-4">
       <v-col cols="12">
         <v-card variant="outlined">
           <v-card-title class="bg-primary">
@@ -240,13 +240,17 @@ export default {
         { title: 'CLOSED', value: 'CLOSED' }
       ],
       currentUserId: null,
-      deployAvailable: false
+      deployAvailable: false,
+      connectionsAvailable: false
     };
   },
   computed: {
     ...mapGetters(['getServerURL', 'isDevelopment']),
     showDeploymentSection() {
       return !this.isDevelopment && this.deployAvailable;
+    },
+    showConnectionsSection() {
+      return this.connectionsAvailable;
     }
   },
   methods: {
@@ -272,6 +276,25 @@ export default {
       } catch (error) {
         // If deploy.php doesn't exist or any error, deployment is not available
         this.deployAvailable = false;
+      }
+    },
+
+    async checkConnectionsAvailability() {
+      try {
+        const response = await fetch(this.getServerURL + '/connections/import', {
+          method: 'GET',
+          credentials: 'include'
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          this.connectionsAvailable = result.available === true;
+        } else {
+          this.connectionsAvailable = false;
+        }
+      } catch (error) {
+        // If any error, connections import is not available
+        this.connectionsAvailable = false;
       }
     },
 
@@ -336,6 +359,9 @@ export default {
         const message = `${result.message || 'Import completed'} - Total: ${result.total || 0} (${details.join(', ')})`;
 
         this.triggerSnackbar({ message, type: 'success' });
+
+        // Update connections availability (connections.zip may have been consumed)
+        await this.checkConnectionsAvailability();
       } catch (error) {
         console.error('Error importing connections:', error);
         this.triggerSnackbar({ message: error.message, type: 'error' });
@@ -510,6 +536,7 @@ export default {
     await this.fetchCurrentUser();
     this.fetchUsers();
     this.checkDeployAvailability();
+    this.checkConnectionsAvailability();
   },
 };
 </script>
