@@ -586,11 +586,11 @@ export default {
       flatConnections: [], // Filtered/searched/paginated connections for display
       headers: [
         { title: 'Score', key: 'searchScore', width: '80px' },
-        { title: 'Application', key: 'application' },
-        { title: 'Server', key: 'server_type' },
+        { title: 'Application', key: 'application', value: item => `${item.company_name || ''} ${item.site_name || ''} ${item.application_name || ''}` },
+        { title: 'Server', key: 'server_type', value: 'url_server_type' },
         { title: 'URL Type', key: 'url_type' },
         { title: 'Service', key: 'url_service' },
-        { title: 'Last Update', key: 'last_update' },
+        { title: 'Last Update', key: 'last_update', value: 'connection_last_update' },
         { title: 'Rating & Usage', key: 'rating_usage', width: '150px', sortable: false },
         { title: 'Has URL', key: 'has_url' },
         { title: 'Has Credentials', key: 'has_credentials' }
