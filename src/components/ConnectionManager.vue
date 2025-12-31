@@ -1306,14 +1306,13 @@ export default {
     await this.fetchAllConnections();
   },
   watch: {
-    defaultDisplay(newValue) {
+    defaultDisplay() {
       // Re-filter using cached results (no API call needed)
       if (this.isEncryptedSearch) {
         this.performEncryptedSearch(); // Uses cached encrypted results
       } else {
         this.performStandardSearch();
       }
-      this.handlePreferenceChange('defaultDisplay', newValue);
     },
     searchTerm() {
       // Re-filter using cached results (no API call needed)
@@ -1323,14 +1322,13 @@ export default {
         this.performStandardSearch();
       }
     },
-    strictSearch(newValue) {
+    strictSearch() {
       // Re-filter using cached results (no API call needed)
       if (this.isEncryptedSearch) {
         this.performEncryptedSearch(); // Uses cached encrypted results
       } else {
         this.performStandardSearch();
       }
-      this.handlePreferenceChange('strictSearch', newValue);
     },
     encryptedSearchTerm(newValue) {
       // If the user erases the encrypted search input, treat it as clearing
