@@ -1,0 +1,288 @@
+<?php
+/**
+ * Finding Memos - Deployment Script
+ *
+ * This script handles frontend deployment with backup and rollback capabilities.
+ *
+ * INSTALLATION:
+ * 1. Copy this file to your server at /finding-memos/deploy.php
+ * 2. Update BACKEND_URL below to match your Python backend URL
+ * 3. Ensure PHP has write permissions for the finding-memos directory
+ *
+ * SECURITY:
+ * - Only accessible to authenticated superusers
+ * - Validates session via Python backend
+ * - Creates automatic backups before deployment
+ * - Automatic rollback on failure
+ */
+
+// === CONFIGURATION ===
+const BACKEND_URL = 'http://localhost:5000'; // UPDATE THIS to your Python backend URL
+const MAX_BACKUPS = 5; // Keep last 5 backups
+const VERSION = '1.0.0';
+
+// === MAIN EXECUTION ===
+header('Content-Type: application/json');
+
+try {
+    // Validate authentication
+    if (!isAuthenticatedSuperuser()) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'error' => 'Unauthorized. Must be logged in as superuser.']);
+        exit;
+    }
+
+    // Check if dist.zip exists
+    if (!file_exists('dist.zip')) {
+        http_response_code(404);
+        echo json_encode(['success' => false, 'error' => 'dist.zip not found. Please upload it first.']);
+        exit;
+    }
+
+    // GET request: just return availability status
+    if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+        echo json_encode(['success' => true, 'available' => true, 'message' => 'dist.zip is ready for deployment']);
+        exit;
+    }
+
+    // POST request: execute deployment
+    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        $result = deploy();
+        echo json_encode($result);
+        exit;
+    }
+
+    // Other methods not allowed
+    http_response_code(405);
+    echo json_encode(['success' => false, 'error' => 'Method not allowed. Use GET to check availability or POST to deploy.']);
+
+} catch (Exception $e) {
+    http_response_code(500);
+    echo json_encode(['success' => false, 'error' => 'Deployment failed: ' . $e->getMessage()]);
+}
+
+// === FUNCTIONS ===
+
+function isAuthenticatedSuperuser() {
+    // Forward cookies to backend for session validation
+    $cookies = '';
+    if (isset($_SERVER['HTTP_COOKIE'])) {
+        $cookies = $_SERVER['HTTP_COOKIE'];
+    }
+
+    $ch = curl_init(BACKEND_URL . '/auth/session-check');
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, ['Cookie: ' . $cookies]);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 5);
+
+    $response = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+
+    if ($httpCode !== 200) {
+        return false;
+    }
+
+    $data = json_decode($response, true);
+    return isset($data['user']) && $data['user']['is_superuser'] === true;
+}
+
+function deploy() {
+    $backupFile = null;
+
+    try {
+        // Step 1: Create backup
+        $backupFile = createBackup();
+
+        // Step 2: Clean old files
+        cleanFrontendFiles();
+
+        // Step 3: Extract new files
+        extractDist();
+
+        // Step 4: Cleanup
+        unlink('dist.zip');
+        cleanOldBackups();
+
+        return [
+            'success' => true,
+            'message' => 'Deployment successful! Please refresh the page.',
+            'backup' => basename($backupFile)
+        ];
+
+    } catch (Exception $e) {
+        // Rollback on error
+        if ($backupFile && file_exists($backupFile)) {
+            rollback($backupFile);
+        }
+        throw $e;
+    }
+}
+
+function createBackup() {
+    $timestamp = date('Y-m-d_H-i-s');
+    $backupFile = "sav/backup_$timestamp.zip";
+
+    // Create sav directory if it doesn't exist
+    if (!is_dir('sav')) {
+        mkdir('sav', 0755, true);
+    }
+
+    // Create zip file
+    $zip = new ZipArchive();
+    if ($zip->open($backupFile, ZipArchive::CREATE) !== TRUE) {
+        throw new Exception('Failed to create backup zip file');
+    }
+
+    // Backup frontend files only (whitelist approach)
+    $itemsToBackup = [
+        'css',
+        'fonts',
+        'js',
+        'img',
+        'index.html',
+        '*.png',
+        '*.webp',
+        '*.svg',
+        'favicon.ico'
+    ];
+
+    foreach ($itemsToBackup as $item) {
+        if (strpos($item, '*') !== false) {
+            // Handle wildcards
+            foreach (glob($item) as $file) {
+                if (is_file($file)) {
+                    $zip->addFile($file, basename($file));
+                }
+            }
+        } elseif (is_dir($item)) {
+            // Add directory recursively
+            addDirectoryToZip($zip, $item, $item);
+        } elseif (is_file($item)) {
+            // Add single file
+            $zip->addFile($item, $item);
+        }
+    }
+
+    $zip->close();
+    return $backupFile;
+}
+
+function cleanFrontendFiles() {
+    // Whitelist of frontend files/folders to delete (NEVER touch backend, .htaccess, etc.)
+    $itemsToDelete = [
+        'css',
+        'fonts',
+        'js',
+        'img',
+        'index.html'
+    ];
+
+    // Also delete image files by extension
+    $extensions = ['png', 'webp', 'svg', 'ico', 'jpg', 'jpeg', 'gif'];
+
+    foreach ($itemsToDelete as $item) {
+        if (is_dir($item)) {
+            recursiveDelete($item);
+        } elseif (is_file($item)) {
+            unlink($item);
+        }
+    }
+
+    // Delete image files by extension
+    foreach ($extensions as $ext) {
+        foreach (glob("*.$ext") as $file) {
+            if (is_file($file)) {
+                unlink($file);
+            }
+        }
+    }
+}
+
+function extractDist() {
+    $zip = new ZipArchive;
+    $res = $zip->open('dist.zip');
+
+    if ($res !== TRUE) {
+        throw new Exception('Failed to open dist.zip');
+    }
+
+    // Extract to current directory
+    if (!$zip->extractTo('.')) {
+        $zip->close();
+        throw new Exception('Failed to extract dist.zip');
+    }
+
+    $zip->close();
+}
+
+function rollback($backupFile) {
+    // First clean current files
+    cleanFrontendFiles();
+
+    // Restore from backup zip
+    if (file_exists($backupFile)) {
+        $zip = new ZipArchive();
+        if ($zip->open($backupFile) === TRUE) {
+            $zip->extractTo('.');
+            $zip->close();
+        }
+    }
+}
+
+function cleanOldBackups() {
+    if (!is_dir('sav')) return;
+
+    // Get all backup zip files
+    $backups = array_filter(scandir('sav'), function($item) {
+        return $item !== '.' && $item !== '..' && pathinfo($item, PATHINFO_EXTENSION) === 'zip';
+    });
+
+    // Sort by name (timestamp) descending
+    rsort($backups);
+
+    // Keep only MAX_BACKUPS, delete the rest
+    $toDelete = array_slice($backups, MAX_BACKUPS);
+    foreach ($toDelete as $backup) {
+        unlink("sav/$backup");
+    }
+}
+
+function addDirectoryToZip($zip, $dir, $zipPath) {
+    if (!is_dir($dir)) return false;
+
+    $files = scandir($dir);
+    foreach ($files as $file) {
+        if ($file === '.' || $file === '..') continue;
+
+        $filePath = "$dir/$file";
+        $zipFilePath = "$zipPath/$file";
+
+        if (is_dir($filePath)) {
+            // Recursively add subdirectory
+            addDirectoryToZip($zip, $filePath, $zipFilePath);
+        } else {
+            // Add file to zip
+            $zip->addFile($filePath, $zipFilePath);
+        }
+    }
+    return true;
+}
+
+function recursiveDelete($dir) {
+    if (!is_dir($dir)) return false;
+
+    $items = scandir($dir);
+    foreach ($items as $item) {
+        if ($item === '.' || $item === '..') continue;
+
+        $path = "$dir/$item";
+        if (is_dir($path)) {
+            recursiveDelete($path);
+        } else {
+            unlink($path);
+        }
+    }
+    rmdir($dir);
+    return true;
+}

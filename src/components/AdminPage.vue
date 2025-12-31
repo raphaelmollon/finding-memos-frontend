@@ -1,5 +1,39 @@
 <template>
   <v-container fluid>
+    <!-- Application Deployment Section -->
+    <v-row v-if="showDeploymentSection" class="mb-4">
+      <v-col cols="12">
+        <v-card variant="outlined">
+          <v-card-title class="bg-success">
+            <v-icon class="mr-2">mdi-cloud-upload</v-icon>
+            Application Deployment
+          </v-card-title>
+          <v-card-text class="pa-4">
+            <v-row align="center">
+              <v-col cols="12" md="8">
+                <div class="text-h6 mb-2">Deploy New Frontend Version</div>
+                <div class="text-body-2 text-grey">
+                  Deploy the uploaded dist.zip to production. This will backup current files, extract the new version,
+                  and automatically rollback if any errors occur. Refresh the page after successful deployment.
+                </div>
+              </v-col>
+              <v-col cols="12" md="4" class="text-right">
+                <v-btn
+                  color="success"
+                  size="large"
+                  prepend-icon="mdi-rocket-launch"
+                  @click="deployFrontend"
+                  :loading="deployLoading"
+                >
+                  Deploy New Version
+                </v-btn>
+              </v-col>
+            </v-row>
+          </v-card-text>
+        </v-card>
+      </v-col>
+    </v-row>
+
     <!-- Connections Management Section -->
     <v-row class="mb-4">
       <v-col cols="12">
@@ -197,6 +231,7 @@ export default {
       deleteDialog: false,
       loading: false,
       importLoading: false,
+      deployLoading: false,
       editedUser: {},
       originalUser: {},
       statusOptions: [
@@ -204,14 +239,79 @@ export default {
         { title: 'VALID', value: 'VALID' },
         { title: 'CLOSED', value: 'CLOSED' }
       ],
-      currentUserId: null
+      currentUserId: null,
+      deployAvailable: false
     };
   },
   computed: {
-    ...mapGetters(['getServerURL'])
+    ...mapGetters(['getServerURL', 'isDevelopment']),
+    showDeploymentSection() {
+      return !this.isDevelopment && this.deployAvailable;
+    }
   },
   methods: {
     ...mapActions(['triggerSnackbar']),
+
+    async checkDeployAvailability() {
+      // Only check if not in development mode
+      if (this.isDevelopment) {
+        this.deployAvailable = false;
+        return;
+      }
+
+      try {
+        // Try to fetch deploy.php with a HEAD request to see if dist.zip exists
+        const response = await fetch('/deploy.php', {
+          method: 'GET',
+          credentials: 'include'
+        });
+
+        // If we get any response, it means deploy.php exists
+        // deploy.php will return 404 if dist.zip doesn't exist
+        this.deployAvailable = response.status !== 404;
+      } catch (error) {
+        // If deploy.php doesn't exist or any error, deployment is not available
+        this.deployAvailable = false;
+      }
+    },
+
+    async deployFrontend() {
+      this.deployLoading = true;
+      try {
+        const response = await fetch('/deploy.php', {
+          method: 'POST',
+          credentials: 'include'
+        });
+
+        const result = await response.json();
+
+        if (!response.ok || !result.success) {
+          throw new Error(result.error || 'Deployment failed');
+        }
+
+        this.triggerSnackbar({
+          message: result.message + ' Backup saved to: ' + result.backup,
+          type: 'success'
+        });
+
+        // Update deployment availability (dist.zip has been deleted)
+        this.deployAvailable = false;
+
+        // Prompt user to refresh
+        setTimeout(() => {
+          if (confirm('Deployment successful! Refresh the page to see the new version?')) {
+            window.location.reload();
+          }
+        }, 2000);
+
+      } catch (error) {
+        console.error('Error deploying frontend:', error);
+        this.triggerSnackbar({ message: error.message, type: 'error' });
+      } finally {
+        this.deployLoading = false;
+      }
+    },
+
     async importConnections() {
       this.importLoading = true;
       try {
@@ -409,6 +509,7 @@ export default {
   async mounted() {
     await this.fetchCurrentUser();
     this.fetchUsers();
+    this.checkDeployAvailability();
   },
 };
 </script>

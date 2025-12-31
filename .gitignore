@@ -4,9 +4,11 @@ node_modules
 
 
 # local env files
-.env.local
-.env.*.local
-.env.*
+.env.production
+
+# Deployment files
+.env.deploy
+dist.zip
 
 # Log files
 npm-debug.log*
